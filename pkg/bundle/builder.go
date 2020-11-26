@@ -10,6 +10,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"github.com/tinyzimmer/k3p/pkg/parser"
 )
 
 const (
@@ -79,13 +81,26 @@ func (b *builder) Setup() error {
 
 func (b *builder) Build(opts *BuildOptions) error {
 	log.Printf("Packaging distribution for version %q using %q architecture\n", b.version, b.arch)
+	defer os.RemoveAll(b.buildDir)
 
 	log.Println("Downloading core k3s components")
 	if err := b.downloadCoreK3sComponents(); err != nil {
 		return err
 	}
 
-	return os.RemoveAll(b.buildDir)
+	log.Println("Parsing kubernetes manifests for container images to download")
+	parser := parser.NewImageParser(opts.ManifestDir, opts.Excludes, parser.TypeRaw)
+
+	images, err := parser.Parse()
+	if err != nil {
+		return err
+	}
+
+	log.Println("Detected the following images to bundle with the package:", images)
+
+	// download images
+
+	return nil
 }
 
 func (b *builder) getDownloadURL(component string) string {
