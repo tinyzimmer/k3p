@@ -2,6 +2,13 @@
 
 A `k3s` packager and installer, primarily intended for airgapped deployments
 
+## TODO
+
+Next up is packaging the actual kubernetes manifests. A parser that finds `yaml` files that have
+valid kubernetes objects, and adds them to the bundle. The base interface needs to be able to be
+extended to allow for supercedence. For example, if a `helm` parser were to find a chart, it needs to be able
+to invalidate that directory for the raw parser (so the user can have a mix, but the raw parser won't try to read templates).
+
 ## Examples
 
 ```bash

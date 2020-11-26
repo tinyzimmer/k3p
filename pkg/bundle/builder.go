@@ -11,6 +11,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/tinyzimmer/k3p/pkg/images"
 	"github.com/tinyzimmer/k3p/pkg/parser"
 )
 
@@ -70,7 +71,7 @@ func (b *builder) Setup() error {
 	log.Println("Using temporary build directory:", b.buildDir)
 
 	// Build out the temp dir structure
-	for _, dir := range []string{"bin", "images", "scripts"} {
+	for _, dir := range []string{"bin", "images", "scripts", "manifests"} {
 		if err := os.MkdirAll(path.Join(b.buildDir, dir), 0755); err != nil {
 			return err
 		}
@@ -81,9 +82,10 @@ func (b *builder) Setup() error {
 
 func (b *builder) Build(opts *BuildOptions) error {
 	log.Printf("Packaging distribution for version %q using %q architecture\n", b.version, b.arch)
-	defer os.RemoveAll(b.buildDir)
+	// defer os.RemoveAll(b.buildDir)
 
 	log.Println("Downloading core k3s components")
+	// need to implement cache layer
 	if err := b.downloadCoreK3sComponents(); err != nil {
 		return err
 	}
@@ -91,14 +93,19 @@ func (b *builder) Build(opts *BuildOptions) error {
 	log.Println("Parsing kubernetes manifests for container images to download")
 	parser := parser.NewImageParser(opts.ManifestDir, opts.Excludes, parser.TypeRaw)
 
-	images, err := parser.Parse()
+	imageNames, err := parser.Parse()
 	if err != nil {
 		return err
 	}
 
-	log.Println("Detected the following images to bundle with the package:", images)
-
-	// download images
+	log.Println("Detected the following images to bundle with the package:", imageNames)
+	downloader := images.NewImageDownloader()
+	if err := downloader.PullImages(imageNames); err != nil {
+		return err
+	}
+	if err := downloader.SaveImagesTo(imageNames, path.Join(b.getImagesDir(), "manifest-images.tar")); err != nil {
+		return err
+	}
 
 	return nil
 }
