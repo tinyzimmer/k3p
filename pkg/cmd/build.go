@@ -40,7 +40,7 @@ var buildCmd = &cobra.Command{
 	Use:   "build",
 	Short: "Build an embedded k3s distribution package",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		builder := build.NewBuilder(buildK3sVersion, buildArch)
+		builder := build.NewBuilder(buildK3sVersion, buildArch, tmpDir)
 		if err := builder.Setup(); err != nil {
 			return err
 		}

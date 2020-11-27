@@ -30,9 +30,10 @@ type Options struct {
 	Output      string
 }
 
-// NewBuilder returns a new Builder for the given K3s version and architecture.
-func NewBuilder(version, arch string) Builder {
-	return &builder{version: version, arch: arch}
+// NewBuilder returns a new Builder for the given K3s version and architecture. If tmpDir
+// is empty, the system default is used.
+func NewBuilder(version, arch, tmpDir string) Builder {
+	return &builder{version: version, arch: arch, tmpDir: tmpDir}
 }
 
 // builder implements the Builder interface.
@@ -43,6 +44,8 @@ type builder struct {
 	arch string
 	// the directory for storing temporary assets during the build
 	writer types.BundleReadWriter
+	// the base tmp directory to use
+	tmpDir string
 }
 
 func (b *builder) Setup() error {
@@ -58,7 +61,7 @@ func (b *builder) Setup() error {
 	}
 
 	// Set up a temporary directory
-	tmpDir, err := ioutil.TempDir("", "")
+	tmpDir, err := ioutil.TempDir(b.tmpDir, "")
 	if err != nil {
 		return err
 	}

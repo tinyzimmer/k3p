@@ -44,13 +44,25 @@ func init() {
 // invocations. It is a very basic implementation that can be refactored
 // in the future.
 type HTTPCache interface {
-	Clean() error
+	// CacheDir returns the current cache directory.
+	CacheDir() string
+	// Get retrieves the given URL from the cache, or the remote server if it
+	// isn't already present locally.
 	Get(url string) (io.ReadCloser, error)
+	// Clean will wipe the contents of the cache.
+	Clean() error
+}
+
+// New creates a new HTTPCache using the given directory
+func New(dir string) HTTPCache {
+	return &httpCache{cacheDir: dir}
 }
 
 type httpCache struct {
 	cacheDir string
 }
+
+func (h *httpCache) CacheDir() string { return h.cacheDir }
 
 func (h *httpCache) Clean() error {
 	if h.cacheDir == "" {
