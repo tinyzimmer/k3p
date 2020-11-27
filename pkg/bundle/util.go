@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -50,8 +49,9 @@ func calculateSha256Sum(filename string) (string, error) {
 	defer f.Close()
 
 	h := sha256.New()
+
 	if _, err := io.Copy(h, f); err != nil {
-		log.Fatal(err)
+		return "", err
 	}
 
 	return fmt.Sprintf("%x", h.Sum(nil)), nil

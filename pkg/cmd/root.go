@@ -1,13 +1,13 @@
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/spf13/cobra"
 
-var (
-	verbose bool
+	"github.com/tinyzimmer/k3p/pkg/log"
 )
 
 func init() {
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
+	rootCmd.PersistentFlags().BoolVarP(&log.Verbose, "verbose", "v", false, "Enable verbose logging")
 }
 
 var rootCmd = &cobra.Command{

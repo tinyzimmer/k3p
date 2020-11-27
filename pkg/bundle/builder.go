@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"strings"
 
 	"github.com/tinyzimmer/k3p/pkg/images"
+	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/parser"
 )
 
@@ -53,13 +53,13 @@ type builder struct {
 func (b *builder) Setup() error {
 	// If using the latest version, fetch the actual semver value
 	if b.version == VersionLatest {
-		log.Println("Detecting latest k3s version")
+		log.Info("Detecting latest k3s version")
 		latest, err := getLatestK3sVersion()
 		if err != nil {
 			return err
 		}
 		b.version = latest
-		log.Println("Latest k3s version is", b.version)
+		log.Info("Latest k3s version is", b.version)
 	}
 
 	// Set up a temporary directory
@@ -68,7 +68,7 @@ func (b *builder) Setup() error {
 		return err
 	}
 	b.buildDir = tmpDir
-	log.Println("Using temporary build directory:", b.buildDir)
+	log.Debug("Using temporary build directory:", b.buildDir)
 
 	// Build out the temp dir structure
 	for _, dir := range []string{"bin", "images", "scripts", "manifests"} {
@@ -81,16 +81,16 @@ func (b *builder) Setup() error {
 }
 
 func (b *builder) Build(opts *BuildOptions) error {
-	log.Printf("Packaging distribution for version %q using %q architecture\n", b.version, b.arch)
-	// defer os.RemoveAll(b.buildDir)
+	log.Infof("Packaging distribution for version %q using %q architecture\n", b.version, b.arch)
+	defer os.RemoveAll(b.buildDir)
 
-	log.Println("Downloading core k3s components")
+	log.Info("Downloading core k3s components")
 	// need to implement cache layer
 	if err := b.downloadCoreK3sComponents(); err != nil {
 		return err
 	}
 
-	log.Println("Parsing kubernetes manifests for container images to download")
+	log.Info("Parsing kubernetes manifests for container images to download")
 	parser := parser.NewImageParser(opts.ManifestDir, opts.Excludes, parser.TypeRaw)
 
 	imageNames, err := parser.Parse()
@@ -98,7 +98,7 @@ func (b *builder) Build(opts *BuildOptions) error {
 		return err
 	}
 
-	log.Println("Detected the following images to bundle with the package:", imageNames)
+	log.Info("Detected the following images to bundle with the package:", imageNames)
 	downloader := images.NewImageDownloader()
 	if err := downloader.PullImages(imageNames); err != nil {
 		return err
@@ -142,27 +142,27 @@ func (b *builder) getDownloadK3sBinName() string {
 }
 
 func (b *builder) downloadCoreK3sComponents() error {
-	log.Println("Fetching checksums...")
+	log.Info("Fetching checksums...")
 	if err := b.downloadK3sChecksums(); err != nil {
 		return err
 	}
 
-	log.Println("Fetching k3s install script...")
+	log.Info("Fetching k3s install script...")
 	if err := b.downloadK3sInstallScript(); err != nil {
 		return err
 	}
 
-	log.Println("Fetching k3s binary...")
+	log.Info("Fetching k3s binary...")
 	if err := b.downloadK3sBinary(); err != nil {
 		return err
 	}
 
-	log.Println("Fetching k3s airgap images...")
+	log.Info("Fetching k3s airgap images...")
 	if err := b.downloadK3sAirgapImages(); err != nil {
 		return err
 	}
 
-	log.Println("Validating checksums...")
+	log.Info("Validating checksums...")
 	if err := b.validateCheckSums(); err != nil {
 		return err
 	}
@@ -224,7 +224,7 @@ func (b *builder) validateCheckSums() error {
 			if localSum == shasum {
 				imagesValid = true
 			} else {
-				log.Println("ERROR: Downloaded airgap images sha256sum is invalid")
+				log.Error("Downloaded airgap images sha256sum is invalid")
 			}
 		case b.getDownloadK3sBinName():
 			localSum, err := calculateSha256Sum(path.Join(b.getBinDir(), "k3s"))
@@ -234,7 +234,7 @@ func (b *builder) validateCheckSums() error {
 			if localSum == shasum {
 				binValid = true
 			} else {
-				log.Println("ERROR: Downloaded k3s binary sha256sum is invalid")
+				log.Error("Downloaded k3s binary sha256sum is invalid")
 			}
 		}
 	}

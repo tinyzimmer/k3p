@@ -3,11 +3,11 @@ package raw
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,7 +46,7 @@ func (p *ImageParser) Parse() ([]string, error) {
 		if info.IsDir() {
 			// Check if this entire directory is excluded
 			if p.IsExcluded(info.Name()) {
-				log.Println("Skipping excluded directory", path)
+				log.Info("Skipping excluded directory", path)
 				return filepath.SkipDir
 			}
 			return nil
@@ -54,7 +54,7 @@ func (p *ImageParser) Parse() ([]string, error) {
 
 		// Check if the current file does not have a yaml extension
 		if !strings.HasSuffix(info.Name(), "yaml") && !strings.HasSuffix(info.Name(), "yml") {
-			// log.Println("Skipping non-yaml file", path) // TODO: Setup verbose logging
+			log.Debug("Skipping non-yaml file", path)
 			return nil
 		}
 
@@ -74,7 +74,7 @@ func (p *ImageParser) Parse() ([]string, error) {
 			// Decode the object
 			obj, _, err := decode([]byte(raw), nil, nil)
 			if err != nil {
-				// log.Printf("Skipping invalid kubernetes object in %q: %s", path, err.Error()) // TODO: verbose logging
+				log.Debugf("Skipping invalid kubernetes object in %q: %s", path, err.Error()) // TODO: verbose logging
 				continue
 			}
 			// Append any images to the local images to be downloaded

@@ -4,12 +4,11 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
-	"log"
 	"os"
 	"strings"
 
+	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 
 	dockertypes "github.com/docker/docker/api/types"
@@ -50,7 +49,7 @@ func (d *dockerImageDownloader) PullImages(images []string) error {
 				if !ok {
 					id = "<unknown>"
 				}
-				log.Println(fmt.Sprintf("%s:%s", statusStr, id))
+				log.Infof("%s:%s", statusStr, id)
 				continue
 			}
 			// cant decide if i really want to invest that much effort into pretty output
