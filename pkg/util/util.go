@@ -14,3 +14,15 @@ func CalculateSHA256Sum(rdr io.Reader) (string, error) {
 	}
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
+
+// IsK8sObject returns true if the given map contains what appears to be a valid Kubernetes object.
+// This function needs to compensate for not having a reliable representation of the full cluster scheme
+// once deployed. So for now, it just checks for the existence of the common fields (kind, apiVersion, metadata).
+func IsK8sObject(data map[string]interface{}) bool {
+	for _, key := range []string{"kind", "apiVersion", "metadata"} {
+		if _, ok := data[key]; !ok {
+			return false
+		}
+	}
+	return true
+}

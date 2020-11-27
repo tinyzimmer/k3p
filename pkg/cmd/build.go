@@ -4,9 +4,12 @@ import (
 	"log"
 	"os"
 	"path"
+	"runtime"
 
 	"github.com/spf13/cobra"
+
 	"github.com/tinyzimmer/k3p/pkg/build"
+	"github.com/tinyzimmer/k3p/pkg/cache"
 )
 
 var (
@@ -26,8 +29,9 @@ func init() {
 	buildCmd.Flags().StringVarP(&buildK3sVersion, "version", "V", build.VersionLatest, "The k3s version to bundle with the package")
 	buildCmd.Flags().StringVarP(&buildManifestDir, "manifests", "m", cwd, "The directory to scan for kubernetes manifests, defaults to the current directory")
 	buildCmd.Flags().StringSliceVarP(&buildExcludeDirs, "exclude", "e", []string{}, "Directories to exclude when reading the manifest directory")
-	buildCmd.Flags().StringVarP(&buildArch, "arch", "a", "amd64", "The architecture to package the distribution for")
+	buildCmd.Flags().StringVarP(&buildArch, "arch", "a", runtime.GOARCH, "The architecture to package the distribution for. Only (amd64, arm, and arm64 are supported)")
 	buildCmd.Flags().StringVarP(&buildOutput, "output", "o", path.Join(cwd, "package.tar"), "The file to save the distribution package to")
+	buildCmd.Flags().BoolVarP(&cache.NoCache, "no-cache", "N", false, "Disable the use of the local cache when downloading assets.")
 
 	rootCmd.AddCommand(buildCmd)
 }

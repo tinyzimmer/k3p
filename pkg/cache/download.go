@@ -2,6 +2,7 @@ package cache
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -43,11 +44,20 @@ func init() {
 // invocations. It is a very basic implementation that can be refactored
 // in the future.
 type HTTPCache interface {
+	Clean() error
 	Get(url string) (io.ReadCloser, error)
 }
 
 type httpCache struct {
 	cacheDir string
+}
+
+func (h *httpCache) Clean() error {
+	if h.cacheDir == "" {
+		return errors.New("No cache directory detected")
+	}
+	log.Info("Wiping cache directory:", h.cacheDir)
+	return os.RemoveAll(h.cacheDir)
 }
 
 func (h *httpCache) Get(url string) (io.ReadCloser, error) {

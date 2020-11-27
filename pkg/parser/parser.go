@@ -24,22 +24,22 @@ const (
 
 const ()
 
-// NewImageParser returns an interface for parsing container images from the given directory.
+// NewManifestParser returns an interface for parsing container images from the given directory.
 // TOOO: Currently only supports a raw manifest parser, with opts for helm/kustomize planned
 // in the future.
-func NewImageParser(parseDir string, excludeDirs []string, parserType Type) types.ImageParser {
-	base := &types.BaseImageParser{
+func NewManifestParser(parseDir string, excludeDirs []string, parserType Type) types.ManifestParser {
+	base := &types.BaseManifestParser{
 		ParseDir:    parseDir,
 		ExcludeDirs: excludeDirs,
 	}
 
-	rawParser := &raw.ImageParser{BaseImageParser: base}
+	rawParser := &raw.ManifestParser{BaseManifestParser: base}
 
 	switch parserType {
 	case TypeHelm:
-		return &helm.ImageParser{Raw: rawParser}
+		return &helm.ManifestParser{Raw: rawParser}
 	case TypeKustomize:
-		return &kustomize.ImageParser{Raw: rawParser}
+		return &kustomize.ManifestParser{Raw: rawParser}
 	default:
 		return rawParser
 	}

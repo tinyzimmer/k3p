@@ -77,20 +77,27 @@ func (b *builder) Build(opts *Options) error {
 		return err
 	}
 
-	log.Info("Parsing kubernetes manifests for container images to download")
-	parser := parser.NewImageParser(opts.ManifestDir, opts.Excludes, parser.TypeRaw)
+	parser := parser.NewManifestParser(opts.ManifestDir, opts.Excludes, parser.TypeRaw)
 
-	imageNames, err := parser.Parse()
+	log.Info("Searching for kubernetes manifests to include in the archive")
+	manifests, err := parser.ParseManifests()
+	if err != nil {
+		return err
+	}
+	for _, manifest := range manifests {
+		if err := b.writer.Put(manifest); err != nil {
+			return err
+		}
+	}
+
+	log.Info("Parsing kubernetes manifests for container images to download")
+	imageNames, err := parser.ParseImages()
 	if err != nil {
 		return err
 	}
 
 	log.Info("Detected the following images to bundle with the package:", imageNames)
-	downloader := images.NewImageDownloader()
-	if err := downloader.PullImages(imageNames); err != nil {
-		return err
-	}
-	rdr, err := downloader.SaveImages(imageNames)
+	rdr, err := images.NewImageDownloader().PullImages(imageNames, b.arch)
 	if err != nil {
 		return err
 	}

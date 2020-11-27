@@ -18,6 +18,7 @@ The k3p command provides an easy method for packaging a kubernetes environment i
 `,
 	SilenceUsage:      true,
 	DisableAutoGenTag: true,
+	SilenceErrors:     true,
 }
 
 // GetRootCommand returns the root k3p command

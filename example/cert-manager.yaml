@@ -474,9 +474,7 @@ spec:
     name: cert-manager-webhook
     namespace: "default"
   version: v1beta1
----
-# Source: cert-manager/charts/webhook/templates/rbac.yaml
-### Webhook ###
+
 ---
 # Source: cert-manager/charts/webhook/templates/pki.yaml
 # Generate a CA Certificate used to sign certificates for the webhook
