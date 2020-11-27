@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/tinyzimmer/k3p/pkg/log"
@@ -64,23 +63,10 @@ func (d *dockerImageDownloader) PullImages(images []string) error {
 	return nil
 }
 
-func (d *dockerImageDownloader) SaveImagesTo(images []string, dest string) error {
+func (d *dockerImageDownloader) SaveImages(images []string) (io.ReadCloser, error) {
 	cli, err := client.NewEnvClient()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	reader, err := cli.ImageSave(context.TODO(), images)
-	if err != nil {
-		return err
-	}
-	out, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-	defer out.Close()
-	if _, err := io.Copy(out, reader); err != nil {
-		return err
-	}
-	return nil
+	return cli.ImageSave(context.TODO(), images)
 }
