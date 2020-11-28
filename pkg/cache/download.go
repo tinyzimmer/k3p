@@ -113,7 +113,7 @@ func (h *httpCache) Get(url string) (io.ReadCloser, error) {
 	}
 	cachePath := path.Join(h.cacheDir, cacheName)
 	log.Debugf("Writing %q to %q", url, cachePath)
-	f, err := os.OpenFile(cachePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	f, err := os.OpenFile(cachePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return nil, err
 	}
