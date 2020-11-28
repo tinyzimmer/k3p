@@ -23,6 +23,16 @@ func parseObjectForImages(obj runtime.Object) []string {
 		if imgs := parseImagesFromContainers(pod.Spec.Containers); len(imgs) > 0 {
 			images = append(images, imgs...)
 		}
+	case "DaemonSet":
+		daemonset, ok := obj.(*appsv1.DaemonSet)
+		if !ok {
+			log.Info("Skipping non apps/v1 DaemonSet")
+			return images
+		}
+		log.Info("Found DaemonSet:", daemonset.GetName())
+		if imgs := parseImagesFromContainers(daemonset.Spec.Template.Spec.Containers); len(imgs) > 0 {
+			images = append(images, imgs...)
+		}
 	case "Deployment": // only supports appsv1 and v1beta1 for now
 		switch gvk.Version {
 		case "v1":

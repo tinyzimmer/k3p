@@ -72,6 +72,8 @@ func (b *builder) Setup() error {
 }
 
 func (b *builder) Build(opts *Options) error {
+	defer b.writer.Close()
+
 	log.Infof("Packaging distribution for version %q using %q architecture\n", b.version, b.arch)
 
 	log.Info("Downloading core k3s components")

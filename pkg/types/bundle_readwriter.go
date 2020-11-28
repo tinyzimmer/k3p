@@ -29,6 +29,7 @@ const (
 type Artifact struct {
 	Type ArtifactType
 	Name string
+	Size int64 // only populated on retrieval
 	Body io.ReadCloser
 }
 
@@ -49,6 +50,21 @@ func (a *Artifact) Verify(sha256sum string) error {
 	return nil
 }
 
+// PackageManifest represents the complete contents of a packaged k3s system.
+type PackageManifest struct {
+	Bins, Scripts, Images, Manifests []*Artifact
+}
+
+// NewPackageManifest initializes a manifest with empty slices.
+func NewPackageManifest() *PackageManifest {
+	return &PackageManifest{
+		Bins:      make([]*Artifact, 0),
+		Scripts:   make([]*Artifact, 0),
+		Images:    make([]*Artifact, 0),
+		Manifests: make([]*Artifact, 0),
+	}
+}
+
 // BundleReadWriter is an interface to be implemented for use by a package bundler/extracter.
 // Different versions of how manifests are built can implement this interface.
 type BundleReadWriter interface {
@@ -56,7 +72,11 @@ type BundleReadWriter interface {
 	Put(*Artifact) error
 	// Read should populate the given artifact with the contents inside the bundle.
 	Get(*Artifact) error
+	// GetManifest should retrieve readable copies of the entire contents of the bundle.
+	GetManifest() (*PackageManifest, error)
 	// ArchiveTo should tar the contents of the bundle (with any required meta) to the given
-	// path. This method should also cleanup the working directory.
+	// path.
 	ArchiveTo(path string) error
+	// Close should cleanup the interface's working directory.
+	Close() error
 }
