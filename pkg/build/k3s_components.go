@@ -14,23 +14,26 @@ import (
 	"github.com/tinyzimmer/k3p/pkg/types"
 )
 
-const k3sScriptURL = "https://get.k3s.io"
+const (
+	k3sScriptURL       = "https://get.k3s.io"
+	k3sReleasesRootURL = "https://github.com/rancher/k3s/releases"
+)
 
-func (b *builder) getDownloadURL(component string) string {
-	return fmt.Sprintf("%s/download/%s/%s", k3sReleasesRootURL, b.version, component)
+func getDownloadURL(version, component string) string {
+	return fmt.Sprintf("%s/download/%s/%s", k3sReleasesRootURL, version, component)
 }
 
-func (b *builder) getDownloadChecksumsName() string {
-	return fmt.Sprintf("sha256sum-%s.txt", b.arch)
+func getDownloadChecksumsName(arch string) string {
+	return fmt.Sprintf("sha256sum-%s.txt", arch)
 }
 
-func (b *builder) getDownloadAirgapImagesName() string {
-	return fmt.Sprintf("k3s-airgap-images-%s.tar", b.arch)
+func getDownloadAirgapImagesName(arch string) string {
+	return fmt.Sprintf("k3s-airgap-images-%s.tar", arch)
 }
 
-func (b *builder) getDownloadK3sBinName() string {
+func getDownloadK3sBinName(arch string) string {
 	var binaryName string
-	switch b.arch {
+	switch arch {
 	case "amd64":
 		binaryName = "k3s"
 	case "arm":
@@ -41,9 +44,9 @@ func (b *builder) getDownloadK3sBinName() string {
 	return binaryName
 }
 
-func (b *builder) downloadCoreK3sComponents() error {
+func (b *builder) downloadCoreK3sComponents(version, arch string) error {
 	log.Info("Fetching checksums...")
-	if err := b.downloadK3sChecksums(); err != nil {
+	if err := b.downloadK3sChecksums(version, arch); err != nil {
 		return err
 	}
 
@@ -53,25 +56,25 @@ func (b *builder) downloadCoreK3sComponents() error {
 	}
 
 	log.Info("Fetching k3s binary...")
-	if err := b.downloadK3sBinary(); err != nil {
+	if err := b.downloadK3sBinary(version, arch); err != nil {
 		return err
 	}
 
 	log.Info("Fetching k3s airgap images...")
-	if err := b.downloadK3sAirgapImages(); err != nil {
+	if err := b.downloadK3sAirgapImages(version, arch); err != nil {
 		return err
 	}
 
 	log.Info("Validating checksums...")
-	if err := b.validateCheckSums(); err != nil {
+	if err := b.validateCheckSums(arch); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (b *builder) downloadK3sChecksums() error {
-	rdr, err := cache.DefaultCache.Get(b.getDownloadURL(b.getDownloadChecksumsName()))
+func (b *builder) downloadK3sChecksums(version, arch string) error {
+	rdr, err := cache.DefaultCache.Get(getDownloadURL(version, getDownloadChecksumsName(arch)))
 	if err != nil {
 		return err
 	}
@@ -93,8 +96,8 @@ func (b *builder) downloadK3sInstallScript() error {
 	})
 }
 
-func (b *builder) downloadK3sAirgapImages() error {
-	rdr, err := cache.DefaultCache.Get(b.getDownloadURL(b.getDownloadAirgapImagesName()))
+func (b *builder) downloadK3sAirgapImages(version, arch string) error {
+	rdr, err := cache.DefaultCache.Get(getDownloadURL(version, getDownloadAirgapImagesName(arch)))
 	if err != nil {
 		return err
 	}
@@ -105,8 +108,8 @@ func (b *builder) downloadK3sAirgapImages() error {
 	})
 }
 
-func (b *builder) downloadK3sBinary() error {
-	rdr, err := cache.DefaultCache.Get(b.getDownloadURL(b.getDownloadK3sBinName()))
+func (b *builder) downloadK3sBinary(version, arch string) error {
+	rdr, err := cache.DefaultCache.Get(getDownloadURL(version, getDownloadK3sBinName(arch)))
 	if err != nil {
 		return err
 	}
@@ -117,7 +120,7 @@ func (b *builder) downloadK3sBinary() error {
 	})
 }
 
-func (b *builder) validateCheckSums() error {
+func (b *builder) validateCheckSums(arch string) error {
 	// Queue up extra check to make sure we visited each
 	var binValid, imagesValid bool
 
@@ -144,7 +147,7 @@ func (b *builder) validateCheckSums() error {
 
 		// verify the checksums
 		switch fname {
-		case b.getDownloadAirgapImagesName():
+		case getDownloadAirgapImagesName(arch):
 			images := &types.Artifact{
 				Type: types.ArtifactImages,
 				Name: "k3s-airgap-images.tar",
@@ -157,7 +160,7 @@ func (b *builder) validateCheckSums() error {
 				return err
 			}
 			imagesValid = true
-		case b.getDownloadK3sBinName():
+		case getDownloadK3sBinName(arch):
 			k3sbin := &types.Artifact{
 				Type: types.ArtifactBin,
 				Name: "k3s",
@@ -190,7 +193,7 @@ func getLatestK3sVersion() (string, error) {
 			return http.ErrUseLastResponse
 		},
 	}
-	u := fmt.Sprintf("%s/%s", k3sReleasesRootURL, VersionLatest)
+	u := fmt.Sprintf("%s/%s", k3sReleasesRootURL, types.VersionLatest)
 	resp, err := client.Get(u)
 	if err != nil {
 		return "", err

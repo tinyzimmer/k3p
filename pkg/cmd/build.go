@@ -10,6 +10,7 @@ import (
 
 	"github.com/tinyzimmer/k3p/pkg/build"
 	"github.com/tinyzimmer/k3p/pkg/cache"
+	"github.com/tinyzimmer/k3p/pkg/types"
 )
 
 var (
@@ -27,7 +28,7 @@ func init() {
 		log.Fatal(err)
 	}
 
-	buildCmd.Flags().StringVarP(&buildK3sVersion, "version", "V", build.VersionLatest, "The k3s version to bundle with the package")
+	buildCmd.Flags().StringVarP(&buildK3sVersion, "version", "V", types.VersionLatest, "The k3s version to bundle with the package")
 	buildCmd.Flags().StringVarP(&buildManifestDir, "manifests", "m", cwd, "The directory to scan for kubernetes manifests and charts, defaults to the current directory")
 	buildCmd.Flags().StringVarP(&buildHelmArgs, "helm-args", "H", "", "Arguments to pass to the 'helm template' command when searching for images")
 	buildCmd.Flags().StringSliceVarP(&buildExcludeDirs, "exclude", "e", []string{}, "Directories to exclude when reading the manifest directory")
@@ -42,11 +43,13 @@ var buildCmd = &cobra.Command{
 	Use:   "build",
 	Short: "Build an embedded k3s distribution package",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		builder := build.NewBuilder(buildK3sVersion, buildArch, tmpDir)
-		if err := builder.Setup(); err != nil {
+		builder, err := build.NewBuilder(tmpDir)
+		if err != nil {
 			return err
 		}
-		return builder.Build(&build.Options{
+		return builder.Build(&types.BuildOptions{
+			K3sVersion:  buildK3sVersion,
+			Arch:        buildArch,
 			ManifestDir: buildManifestDir,
 			HelmArgs:    buildHelmArgs,
 			Excludes:    buildExcludeDirs,

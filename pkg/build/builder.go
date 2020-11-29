@@ -10,76 +10,42 @@ import (
 	"github.com/tinyzimmer/k3p/pkg/types"
 )
 
-const (
-	// VersionLatest is a string signaling that the latest version should be retrieved for k3s.
-	VersionLatest string = "latest"
-
-	k3sReleasesRootURL string = "https://github.com/rancher/k3s/releases"
-)
-
-// Builder is an interface for building application bundles to be distributed to systems.
-type Builder interface {
-	Setup() error
-	Build(*Options) error
-}
-
-// Options is a struct containing options to pass to the build operation.
-type Options struct {
-	ManifestDir string
-	HelmArgs    string
-	Excludes    []string
-	Output      string
-}
-
 // NewBuilder returns a new Builder for the given K3s version and architecture. If tmpDir
 // is empty, the system default is used.
-func NewBuilder(version, arch, tmpDir string) Builder {
-	return &builder{version: version, arch: arch, tmpDir: tmpDir}
+func NewBuilder(tmpDir string) (types.Builder, error) {
+	// Set up a temporary directory
+	tmpDir, err := ioutil.TempDir(tmpDir, "")
+	if err != nil {
+		return nil, err
+	}
+	log.Debug("Using temporary build directory:", tmpDir)
+	return &builder{writer: v1.New(tmpDir)}, nil
 }
 
 // builder implements the Builder interface.
 type builder struct {
-	// the k3s version to bundle in the package
-	version string
-	// the architecture to download images and binaries for
-	arch string
 	// the directory for storing temporary assets during the build
 	writer types.BundleReadWriter
-	// the base tmp directory to use
-	tmpDir string
 }
 
-func (b *builder) Setup() error {
-	// If using the latest version, fetch the actual semver value
-	if b.version == VersionLatest {
+func (b *builder) Build(opts *types.BuildOptions) error {
+	defer b.writer.Close()
+
+	if opts.K3sVersion == types.VersionLatest {
 		log.Info("Detecting latest k3s version")
 		latest, err := getLatestK3sVersion()
 		if err != nil {
 			return err
 		}
-		b.version = latest
-		log.Info("Latest k3s version is", b.version)
+		opts.K3sVersion = latest
+		log.Info("Latest k3s version is", opts.K3sVersion)
 	}
 
-	// Set up a temporary directory
-	tmpDir, err := ioutil.TempDir(b.tmpDir, "")
-	if err != nil {
-		return err
-	}
-	log.Debug("Using temporary build directory:", tmpDir)
-
-	b.writer = v1.New(tmpDir)
-	return nil
-}
-
-func (b *builder) Build(opts *Options) error {
-	defer b.writer.Close()
-
-	log.Infof("Packaging distribution for version %q using %q architecture\n", b.version, b.arch)
+	log.Infof("Packaging distribution for version %q using %q architecture\n", opts.K3sVersion, opts.Arch)
 
 	log.Info("Downloading core k3s components")
 	// need to implement cache layer
-	if err := b.downloadCoreK3sComponents(); err != nil {
+	if err := b.downloadCoreK3sComponents(opts.K3sVersion, opts.Arch); err != nil {
 		return err
 	}
 
@@ -103,7 +69,7 @@ func (b *builder) Build(opts *Options) error {
 	}
 
 	log.Info("Detected the following images to bundle with the package:", imageNames)
-	rdr, err := images.NewImageDownloader().PullImages(imageNames, b.arch)
+	rdr, err := images.NewImageDownloader().PullImages(imageNames, opts.Arch)
 	if err != nil {
 		return err
 	}

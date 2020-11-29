@@ -200,10 +200,6 @@ func (rw *readWriter) ArchiveTo(path string) error {
 	})
 }
 
-func (rw *readWriter) generateFileManifest() ([]byte, error) {
-	return nil, nil
-}
-
 func (rw *readWriter) stripWorkdirPrefix(path string) string {
 	return strings.Replace(path, rw.workDir+"/", "", 1)
 }

@@ -14,22 +14,12 @@ const k3sManifestsDir = "/var/lib/rancher/k3s/server/manifests"
 const k3sImagesDir = "/var/lib/rancher/k3s/agent/images"
 const k3sScriptdir = "/usr/local/bin/k3p"
 
-// Installer is an interface for laying a package manifest down on a system
-// and setting up K3s.
-type Installer interface {
-	Install(*types.PackageManifest, *Options) error
-}
-
-// Options is a placeholder for later options to be used when configuring
-// installations.
-type Options struct{}
-
 // New returns a new package installer.
-func New() Installer { return &installer{} }
+func New() types.Installer { return &installer{} }
 
 type installer struct{}
 
-func (i *installer) Install(manifest *types.PackageManifest, opts *Options) error {
+func (i *installer) Install(manifest *types.PackageManifest, opts *types.InstallOptions) error {
 
 	log.Info("Installing binaries to /usr/local/bin/")
 	for _, bin := range manifest.Bins {

@@ -8,6 +8,7 @@ import (
 
 	v1 "github.com/tinyzimmer/k3p/pkg/archive/v1"
 	"github.com/tinyzimmer/k3p/pkg/install"
+	"github.com/tinyzimmer/k3p/pkg/types"
 )
 
 func init() {
@@ -35,6 +36,6 @@ var installCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return install.New().Install(manifest, &install.Options{})
+		return install.New().Install(manifest, &types.InstallOptions{})
 	},
 }
