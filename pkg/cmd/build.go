@@ -13,6 +13,7 @@ import (
 )
 
 var (
+	buildHelmArgs    string
 	buildK3sVersion  string
 	buildManifestDir string
 	buildExcludeDirs []string
@@ -27,7 +28,8 @@ func init() {
 	}
 
 	buildCmd.Flags().StringVarP(&buildK3sVersion, "version", "V", build.VersionLatest, "The k3s version to bundle with the package")
-	buildCmd.Flags().StringVarP(&buildManifestDir, "manifests", "m", cwd, "The directory to scan for kubernetes manifests, defaults to the current directory")
+	buildCmd.Flags().StringVarP(&buildManifestDir, "manifests", "m", cwd, "The directory to scan for kubernetes manifests and charts, defaults to the current directory")
+	buildCmd.Flags().StringVarP(&buildHelmArgs, "helm-args", "H", "", "Arguments to pass to the 'helm template' command when searching for images")
 	buildCmd.Flags().StringSliceVarP(&buildExcludeDirs, "exclude", "e", []string{}, "Directories to exclude when reading the manifest directory")
 	buildCmd.Flags().StringVarP(&buildArch, "arch", "a", runtime.GOARCH, "The architecture to package the distribution for. Only (amd64, arm, and arm64 are supported)")
 	buildCmd.Flags().StringVarP(&buildOutput, "output", "o", path.Join(cwd, "package.tar"), "The file to save the distribution package to")
@@ -46,6 +48,7 @@ var buildCmd = &cobra.Command{
 		}
 		return builder.Build(&build.Options{
 			ManifestDir: buildManifestDir,
+			HelmArgs:    buildHelmArgs,
 			Excludes:    buildExcludeDirs,
 			Output:      buildOutput,
 		})

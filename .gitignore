@@ -1,3 +1,5 @@
 dist/
 vendor/
-package.tar
+*.tar
+*.tgz
+*.tar.gz

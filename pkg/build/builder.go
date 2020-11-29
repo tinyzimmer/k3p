@@ -26,6 +26,7 @@ type Builder interface {
 // Options is a struct containing options to pass to the build operation.
 type Options struct {
 	ManifestDir string
+	HelmArgs    string
 	Excludes    []string
 	Output      string
 }
@@ -82,7 +83,7 @@ func (b *builder) Build(opts *Options) error {
 		return err
 	}
 
-	parser := parser.NewManifestParser(opts.ManifestDir, opts.Excludes, parser.TypeRaw)
+	parser := parser.NewManifestParser(opts.ManifestDir, opts.Excludes, opts.HelmArgs)
 
 	log.Info("Searching for kubernetes manifests to include in the archive")
 	manifests, err := parser.ParseManifests()

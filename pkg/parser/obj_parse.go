@@ -1,6 +1,9 @@
-package raw
+package parser
 
 import (
+	"io/ioutil"
+	"strings"
+
 	"github.com/tinyzimmer/k3p/pkg/log"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -10,6 +13,34 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
+
+func (p *ManifestParser) parseFileForImages(file string) ([]string, error) {
+	images := make([]string, 0)
+	data, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+
+	// iterate all the yaml objects in the file
+	rawYamls := strings.Split(string(data), "---")
+	for _, raw := range rawYamls {
+		// Check if this is empty space
+		if strings.TrimSpace(raw) == "" {
+			continue
+		}
+		// Decode the object
+		obj, err := p.Decode([]byte(raw))
+		if err != nil {
+			log.Debugf("Skipping invalid kubernetes object in %q: %s", file, err.Error())
+			continue
+		}
+		// Append any images to the local images to be downloaded
+		if objImgs := parseObjectForImages(obj); len(objImgs) > 0 {
+			images = appendIfMissing(images, objImgs...)
+		}
+	}
+	return images, nil
+}
 
 func parseObjectForImages(obj runtime.Object) []string {
 	images := make([]string, 0)
@@ -37,13 +68,13 @@ func parseObjectForImages(obj runtime.Object) []string {
 		switch gvk.Version {
 		case "v1":
 			deployment := obj.(*appsv1.Deployment)
-			log.Info("Found Deployment:", deployment.GetName())
+			log.Info("Found appsv1 Deployment:", deployment.GetName())
 			if imgs := parseImagesFromContainers(deployment.Spec.Template.Spec.Containers); len(imgs) > 0 {
 				images = append(images, imgs...)
 			}
 		case "v1beta1":
 			deployment := obj.(*appsv1beta1.Deployment)
-			log.Info("Found Deployment:", deployment.GetName())
+			log.Info("Found appsv1beta1 Deployment:", deployment.GetName())
 			if imgs := parseImagesFromContainers(deployment.Spec.Template.Spec.Containers); len(imgs) > 0 {
 				images = append(images, imgs...)
 			}
@@ -91,6 +122,7 @@ func parseImagesFromContainers(containers []corev1.Container) []string {
 	images := make([]string, 0)
 	for _, container := range containers {
 		if container.Image != "" {
+			log.Debug("Found container image:", container.Image)
 			images = append(images, container.Image)
 		}
 	}

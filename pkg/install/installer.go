@@ -79,7 +79,7 @@ func (i *installer) Install(manifest *types.PackageManifest, opts *Options) erro
 		}
 	}
 
-	log.Info("Install kubernetes manifests to", k3sManifestsDir)
+	log.Info("Installing kubernetes manifests to", k3sManifestsDir)
 	if err := os.MkdirAll(k3sManifestsDir, 0755); err != nil {
 		return err
 	}
