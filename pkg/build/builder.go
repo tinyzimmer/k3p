@@ -2,19 +2,22 @@ package build
 
 import (
 	"io/ioutil"
+	"os"
+	"strings"
 
-	v1 "github.com/tinyzimmer/k3p/pkg/archive/v1"
+	v1 "github.com/tinyzimmer/k3p/pkg/build/archive/v1"
 	"github.com/tinyzimmer/k3p/pkg/images"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/parser"
 	"github.com/tinyzimmer/k3p/pkg/types"
+	"github.com/tinyzimmer/k3p/pkg/util"
 )
 
 // NewBuilder returns a new Builder for the given K3s version and architecture. If tmpDir
 // is empty, the system default is used.
-func NewBuilder(tmpDir string) (types.Builder, error) {
+func NewBuilder() (types.Builder, error) {
 	// Set up a temporary directory
-	tmpDir, err := ioutil.TempDir(tmpDir, "")
+	tmpDir, err := util.GetTempDir()
 	if err != nil {
 		return nil, err
 	}
@@ -68,6 +71,19 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 		return err
 	}
 
+	if opts.ImageFile != "" {
+		log.Infof("Reading container images from %q", opts.ImageFile)
+		body, err := ioutil.ReadFile(opts.ImageFile)
+		if err != nil {
+			return err
+		}
+		for _, img := range strings.Split(string(body), "\n") {
+			if img != "" && !strings.HasPrefix(img, "#") {
+				imageNames = append(imageNames, img)
+			}
+		}
+	}
+
 	log.Info("Detected the following images to bundle with the package:", imageNames)
 	rdr, err := images.NewImageDownloader().PullImages(imageNames, opts.Arch)
 	if err != nil {
@@ -79,6 +95,20 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 		Body: rdr,
 	}); err != nil {
 		return err
+	}
+
+	if opts.EULAFile != "" {
+		log.Infof("Adding EULA from %q", opts.EULAFile)
+		f, err := os.Open(opts.EULAFile)
+		if err != nil {
+			return err
+		}
+		if err := b.writer.Put(&types.Artifact{
+			Name: "EULA.txt",
+			Body: f,
+		}); err != nil {
+			return err
+		}
 	}
 
 	log.Infof("Archiving bundle to %q", opts.Output)

@@ -19,31 +19,6 @@ const (
 	k3sReleasesRootURL = "https://github.com/rancher/k3s/releases"
 )
 
-func getDownloadURL(version, component string) string {
-	return fmt.Sprintf("%s/download/%s/%s", k3sReleasesRootURL, version, component)
-}
-
-func getDownloadChecksumsName(arch string) string {
-	return fmt.Sprintf("sha256sum-%s.txt", arch)
-}
-
-func getDownloadAirgapImagesName(arch string) string {
-	return fmt.Sprintf("k3s-airgap-images-%s.tar", arch)
-}
-
-func getDownloadK3sBinName(arch string) string {
-	var binaryName string
-	switch arch {
-	case "amd64":
-		binaryName = "k3s"
-	case "arm":
-		binaryName = "k3s-armhf"
-	case "arm64":
-		binaryName = "k3s-arm64"
-	}
-	return binaryName
-}
-
 func (b *builder) downloadCoreK3sComponents(version, arch string) error {
 	log.Info("Fetching checksums...")
 	if err := b.downloadK3sChecksums(version, arch); err != nil {
@@ -200,4 +175,29 @@ func getLatestK3sVersion() (string, error) {
 	}
 	latestURL := resp.Header.Get("Location")
 	return path.Base(latestURL), nil
+}
+
+func getDownloadURL(version, component string) string {
+	return fmt.Sprintf("%s/download/%s/%s", k3sReleasesRootURL, version, component)
+}
+
+func getDownloadChecksumsName(arch string) string {
+	return fmt.Sprintf("sha256sum-%s.txt", arch)
+}
+
+func getDownloadAirgapImagesName(arch string) string {
+	return fmt.Sprintf("k3s-airgap-images-%s.tar", arch)
+}
+
+func getDownloadK3sBinName(arch string) string {
+	var binaryName string
+	switch arch {
+	case "amd64":
+		binaryName = "k3s"
+	case "arm":
+		binaryName = "k3s-armhf"
+	case "arm64":
+		binaryName = "k3s-arm64"
+	}
+	return binaryName
 }

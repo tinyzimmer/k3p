@@ -9,6 +9,8 @@ type Builder interface {
 type BuildOptions struct {
 	K3sVersion  string
 	Arch        string
+	EULAFile    string
+	ImageFile   string
 	ManifestDir string
 	HelmArgs    string
 	Excludes    []string

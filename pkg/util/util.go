@@ -4,7 +4,16 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
 )
+
+// TempDir cast as a var to be overridden by CLI flags.
+var TempDir = os.TempDir()
+
+// GetTempDir is a utility function for retrieving a new temporary directory within either
+// the system default, or user-configured path.
+func GetTempDir() (string, error) { return ioutil.TempDir(TempDir, "") }
 
 // CalculateSHA256Sum calculates the sha256sum of the contents of the given reader.
 func CalculateSHA256Sum(rdr io.Reader) (string, error) {

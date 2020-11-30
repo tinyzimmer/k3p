@@ -5,7 +5,9 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"time"
 
+	v1 "github.com/tinyzimmer/k3p/pkg/build/archive/v1"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 )
@@ -19,8 +21,85 @@ func New() types.Installer { return &installer{} }
 
 type installer struct{}
 
-func (i *installer) Install(manifest *types.PackageManifest, opts *types.InstallOptions) error {
+func (i *installer) Install(opts *types.InstallOptions) error {
+	pkg, err := v1.Load(opts.TarPath)
+	if err != nil {
+		return err
+	}
+	defer pkg.Close()
 
+	// check package for a EULA
+	eula := &types.Artifact{Name: "EULA.txt"}
+	if err := pkg.Get(eula); err == nil {
+		// File was found
+		if !opts.AcceptEULA {
+			pager := os.Getenv("PAGER")
+			if pager == "" {
+				pager = "less"
+			}
+			cmd := exec.Command(pager)
+			cmd.Stdin = eula.Body
+			cmd.Stdout = os.Stdout
+			if err := cmd.Run(); err != nil {
+				return err
+			}
+			time.Sleep(time.Second)
+		}
+	} else if !os.IsNotExist(err) {
+		// Error other than file not found
+		return err
+	}
+
+	manifest, err := pkg.GetManifest()
+	if err != nil {
+		return err
+	}
+
+	if err := i.installManifest(manifest); err != nil {
+		return err
+	}
+
+	log.Info("Running k3s installation script")
+	os.Setenv("INSTALL_K3S_SKIP_DOWNLOAD", "true")
+	if opts.NodeName != "" {
+		log.Info("Using node name:", opts.NodeName)
+		os.Setenv("K3S_NODE_NAME", opts.NodeName)
+	}
+	if opts.ServerURL != "" && opts.NodeToken != "" {
+		log.Info("Joining server at:", opts.ServerURL)
+		os.Setenv("K3S_URL", opts.ServerURL)
+		os.Setenv("K3S_TOKEN", opts.NodeToken)
+	}
+	if opts.ResolvConf != "" {
+		log.Info("Using custom resolv-conf at:", opts.ResolvConf)
+		os.Setenv("K3S_RESOLV_CONF", opts.ResolvConf)
+	}
+	if opts.KubeconfigMode != "" {
+		log.Info("Setting admin kubeconfig mode to", opts.KubeconfigMode)
+		os.Setenv("K3S_KUBECONFIG_MODE", opts.KubeconfigMode)
+	}
+	if opts.K3sExecArgs != "" {
+		log.Infof("Applying extra k3s arguments: %q", opts.K3sExecArgs)
+		os.Setenv("INSTALL_K3S_EXEC", opts.K3sExecArgs)
+	}
+	cmd := exec.Command("/bin/sh", path.Join(k3sScriptdir, "install.sh"))
+
+	outPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	errPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
+
+	go io.Copy(os.Stdout, outPipe)
+	go io.Copy(os.Stderr, errPipe)
+
+	return cmd.Run()
+}
+
+func (i *installer) installManifest(manifest *types.PackageManifest) error {
 	log.Info("Installing binaries to /usr/local/bin/")
 	for _, bin := range manifest.Bins {
 		defer bin.Body.Close()
@@ -90,24 +169,5 @@ func (i *installer) Install(manifest *types.PackageManifest, opts *types.Install
 		}
 	}
 
-	log.Info("Running k3s installation script")
-	os.Setenv("INSTALL_K3S_SKIP_DOWNLOAD", "true")
-	cmd := exec.Command("/bin/sh", path.Join(k3sScriptdir, "install.sh"))
-	outPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	errPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return err
-	}
-
-	go io.Copy(os.Stdout, outPipe)
-	go io.Copy(os.Stderr, errPipe)
-
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-
-	return cmd.Wait()
+	return nil
 }

@@ -3,9 +3,26 @@ package types
 // Installer is an interface for laying a package manifest down on a system
 // and setting up K3s.
 type Installer interface {
-	Install(*PackageManifest, *InstallOptions) error
+	Install(opts *InstallOptions) error
 }
 
-// InstallOptions is a placeholder for later options to be used when configuring
-// installations.
-type InstallOptions struct{}
+// InstallOptions are options to pass to an installation
+type InstallOptions struct {
+	// The path to the tar archive
+	TarPath string
+	// An optional name to give the node
+	NodeName string
+	// Whether to skip viewing any EULA included in the package
+	AcceptEULA bool
+	// The URL to an already running k3s server to join as an agent
+	ServerURL string
+	// The node token of the already running k3s server
+	NodeToken string
+	// An optional resolv conf to use when configuring DNS
+	ResolvConf string
+	// Optionally override the default k3s kubeconfig mode (0600)
+	// It is a string so it can be passed directly as an env var
+	KubeconfigMode string
+	// Extra arguments to pass to the k3s server or agent process
+	K3sExecArgs string
+}

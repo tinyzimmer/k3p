@@ -14,7 +14,11 @@ type ManifestParser interface {
 	ParseManifests() ([]*Artifact, error)
 }
 
-// BaseManifestParser represents the base elements for a parser interface.
+// BaseManifestParser represents the base elements for a parser interface. It contains
+// convenience methods for common directory and file operations. The original intention
+// of this here was to be used as a base for different processors (e.g. raw, helm, kustomize, jsonnet, etc.),
+// however in working towards a POC it made sense to keep things simple and combine raw and helm into a single
+// interface.
 type BaseManifestParser struct {
 	ParseDir     string
 	ExcludeDirs  []string

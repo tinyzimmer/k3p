@@ -3,7 +3,6 @@ package v1
 import (
 	"archive/tar"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
+	"github.com/tinyzimmer/k3p/pkg/util"
 )
 
 const (
@@ -29,7 +29,7 @@ func New(dir string) types.BundleReadWriter { return &readWriter{workDir: dir} }
 
 // Load will load the bundle from the given tar archive. TmpDir is the directory to temporarily
 // unarchive the contents to. If it is blank, the system default is used.
-func Load(tarPath string, tmpDir string) (types.BundleReadWriter, error) {
+func Load(tarPath string) (types.BundleReadWriter, error) {
 	log.Infof("Extracting %q", tarPath)
 	// Open the archive
 	f, err := os.Open(tarPath)
@@ -39,7 +39,7 @@ func Load(tarPath string, tmpDir string) (types.BundleReadWriter, error) {
 	defer f.Close()
 
 	// Create a work directory for the readwriter
-	workdir, err := ioutil.TempDir(tmpDir, "")
+	workdir, err := util.GetTempDir()
 	if err != nil {
 		return nil, err
 	}

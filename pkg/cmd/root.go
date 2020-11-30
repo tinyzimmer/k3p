@@ -1,21 +1,20 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 
 	"github.com/tinyzimmer/k3p/pkg/cache"
 	"github.com/tinyzimmer/k3p/pkg/log"
+	"github.com/tinyzimmer/k3p/pkg/util"
 )
 
 var (
-	cacheDir, tmpDir string
+	cacheDir string
 )
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cacheDir, "cache", cache.DefaultCache.CacheDir(), "Override the default location for cached k3s assets")
-	rootCmd.PersistentFlags().StringVar(&tmpDir, "tmp-dir", os.TempDir(), "Override the default tmp directory")
+	rootCmd.PersistentFlags().StringVar(&cacheDir, "cache-dir", cache.DefaultCache.CacheDir(), "Override the default location for cached k3s assets")
+	rootCmd.PersistentFlags().StringVar(&util.TempDir, "tmp-dir", util.TempDir, "Override the default tmp directory")
 	rootCmd.PersistentFlags().BoolVarP(&log.Verbose, "verbose", "v", false, "Enable verbose logging")
 }
 

@@ -16,14 +16,17 @@ import (
 
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
+	"github.com/tinyzimmer/k3p/pkg/util"
 )
 
+// TODO: Makes targetNamespace configurable for charts
 var helmCRTmpl = template.Must(template.New("helm-cr").Funcs(sprig.TxtFuncMap()).Parse(`apiVersion: helm.cattle.io/v1
 kind: HelmChart
 metadata:
   name: {{ .Name }}
   namespace: kube-system
 spec:
+  targetNamespace: default 
   chartContent: {{ .ChartContent }}
 {{- if .ValuesContent }}
   valuesContent: |-
@@ -81,6 +84,11 @@ func (p *ManifestParser) packageHelmChartToManifest(chartPath string) (*types.Ar
 	if helmArgs := p.GetHelmArgs(); helmArgs != "" {
 		fields := strings.Fields(helmArgs)
 		for idx, arg := range fields {
+			if strings.HasPrefix(arg, "--values=") {
+				f := strings.Join(strings.Split(arg, "=")[1:], "=")
+				valuesFiles = append(valuesFiles, f)
+				continue
+			}
 			if arg == "-f" || arg == "--values" {
 				if len(fields) < idx {
 					return nil, errors.New("got -f or --values helm flag without an argument")
@@ -89,6 +97,7 @@ func (p *ManifestParser) packageHelmChartToManifest(chartPath string) (*types.Ar
 			}
 		}
 	}
+	log.Debug("Combining the following values files for helm:", valuesFiles)
 	var valuesContent string
 	if len(valuesFiles) > 0 {
 		for _, f := range valuesFiles {
@@ -101,11 +110,12 @@ func (p *ManifestParser) packageHelmChartToManifest(chartPath string) (*types.Ar
 	}
 
 	// package the chart to a temp file
-	tmpDir, err := ioutil.TempDir("", "") // refactor should let this be configurable by flag
+	tmpDir, err := util.GetTempDir()
 	if err != nil {
 		return nil, err
 	}
 	defer os.RemoveAll(tmpDir)
+	log.Debugf("Executing command: helm package %s -d %s", chartPath, tmpDir)
 	_, err = exec.Command("helm", "package", chartPath, "-d", tmpDir).Output()
 	if err != nil {
 		return nil, err

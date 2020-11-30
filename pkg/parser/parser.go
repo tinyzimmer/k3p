@@ -18,8 +18,6 @@ import (
 )
 
 // NewManifestParser returns an interface for parsing container images from the given directory.
-// TOOO: Currently only supports a raw manifest parser, with opts for helm/kustomize planned
-// in the future.
 func NewManifestParser(parseDir string, excludeDirs []string, helmArgs string) types.ManifestParser {
 	// create a new scheme
 	sch := runtime.NewScheme()

@@ -52,6 +52,7 @@ func (a *Artifact) Verify(sha256sum string) error {
 
 // PackageManifest represents the complete contents of a packaged k3s system.
 type PackageManifest struct {
+	EULA                             *Artifact
 	Bins, Scripts, Images, Manifests []*Artifact
 }
 

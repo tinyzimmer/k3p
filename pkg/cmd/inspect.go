@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	v1 "github.com/tinyzimmer/k3p/pkg/archive/v1"
+	v1 "github.com/tinyzimmer/k3p/pkg/build/archive/v1"
 )
 
 func init() {
@@ -16,7 +16,7 @@ var inspectCmd = &cobra.Command{
 	Short: "Inspect the given package",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		pkg, err := v1.Load(args[0], tmpDir)
+		pkg, err := v1.Load(args[0])
 		if err != nil {
 			return err
 		}
