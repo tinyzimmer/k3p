@@ -59,7 +59,6 @@ func (i *installer) Install(opts *types.InstallOptions) error {
 		return err
 	}
 
-	log.Info("Running k3s installation script")
 	os.Setenv("INSTALL_K3S_SKIP_DOWNLOAD", "true")
 	if opts.NodeName != "" {
 		log.Info("Using node name:", opts.NodeName)
@@ -82,6 +81,7 @@ func (i *installer) Install(opts *types.InstallOptions) error {
 		log.Infof("Applying extra k3s arguments: %q", opts.K3sExecArgs)
 		os.Setenv("INSTALL_K3S_EXEC", opts.K3sExecArgs)
 	}
+	log.Info("Running k3s installation script")
 	cmd := exec.Command("/bin/sh", path.Join(k3sScriptdir, "install.sh"))
 
 	outPipe, err := cmd.StdoutPipe()

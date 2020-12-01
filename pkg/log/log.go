@@ -11,10 +11,10 @@ var Verbose bool
 var infoLogger, warningLogger, errorLogger, debugLogger *glog.Logger
 
 func init() {
-	infoLogger = glog.New(os.Stderr, "INFO: ", glog.Ldate|glog.Ltime)
-	warningLogger = glog.New(os.Stderr, "WARNING: ", glog.Ldate|glog.Ltime)
-	errorLogger = glog.New(os.Stderr, "ERROR: ", glog.Ldate|glog.Ltime)
-	debugLogger = glog.New(os.Stderr, "DEBUG: ", glog.Ldate|glog.Ltime)
+	infoLogger = glog.New(os.Stderr, "[INFO] ", glog.Ldate|glog.Ltime)
+	warningLogger = glog.New(os.Stderr, "[WARNING] ", glog.Ldate|glog.Ltime)
+	errorLogger = glog.New(os.Stderr, "[ERROR] ", glog.Ldate|glog.Ltime)
+	debugLogger = glog.New(os.Stderr, "[DEBUG] ", glog.Ldate|glog.Ltime)
 }
 
 // Info is the equivalent of a log.Println on the info logger.
