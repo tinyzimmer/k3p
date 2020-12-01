@@ -10,6 +10,7 @@ import (
 	v1 "github.com/tinyzimmer/k3p/pkg/build/archive/v1"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
+	"github.com/tinyzimmer/k3p/pkg/util"
 )
 
 const k3sManifestsDir = "/var/lib/rancher/k3s/server/manifests"
@@ -50,39 +51,22 @@ func (i *installer) Install(opts *types.InstallOptions) error {
 		return err
 	}
 
+	// retrieve the full contents of the package
 	manifest, err := pkg.GetManifest()
 	if err != nil {
 		return err
 	}
 
+	// unpack the manifest into the appropriate locations
 	if err := i.installManifest(manifest); err != nil {
 		return err
 	}
 
-	os.Setenv("INSTALL_K3S_SKIP_DOWNLOAD", "true")
-	if opts.NodeName != "" {
-		log.Info("Using node name:", opts.NodeName)
-		os.Setenv("K3S_NODE_NAME", opts.NodeName)
-	}
-	if opts.ServerURL != "" && opts.NodeToken != "" {
-		log.Info("Joining server at:", opts.ServerURL)
-		os.Setenv("K3S_URL", opts.ServerURL)
-		os.Setenv("K3S_TOKEN", opts.NodeToken)
-	}
-	if opts.ResolvConf != "" {
-		log.Info("Using custom resolv-conf at:", opts.ResolvConf)
-		os.Setenv("K3S_RESOLV_CONF", opts.ResolvConf)
-	}
-	if opts.KubeconfigMode != "" {
-		log.Info("Setting admin kubeconfig mode to", opts.KubeconfigMode)
-		os.Setenv("K3S_KUBECONFIG_MODE", opts.KubeconfigMode)
-	}
-	if opts.K3sExecArgs != "" {
-		log.Infof("Applying extra k3s arguments: %q", opts.K3sExecArgs)
-		os.Setenv("INSTALL_K3S_EXEC", opts.K3sExecArgs)
-	}
+	// set environment variables for the install script
+	configureK3sEnv(opts)
+
 	log.Info("Running k3s installation script")
-	cmd := exec.Command("/bin/sh", path.Join(k3sScriptdir, "install.sh"))
+	cmd := exec.Command("/bin/sh", path.Join(k3sScriptdir, "install.sh"), string(opts.K3sRole))
 
 	outPipe, err := cmd.StdoutPipe()
 	if err != nil {
@@ -170,4 +154,39 @@ func (i *installer) installManifest(manifest *types.PackageManifest) error {
 	}
 
 	return nil
+}
+
+func configureK3sEnv(opts *types.InstallOptions) {
+	os.Setenv("INSTALL_K3S_SKIP_DOWNLOAD", "true")
+	if opts.NodeName != "" {
+		log.Info("Using node name:", opts.NodeName)
+		os.Setenv("K3S_NODE_NAME", opts.NodeName)
+	}
+
+	if opts.ResolvConf != "" {
+		log.Info("Using custom resolv-conf at:", opts.ResolvConf)
+		os.Setenv("K3S_RESOLV_CONF", opts.ResolvConf)
+	}
+	if opts.KubeconfigMode != "" {
+		log.Info("Setting admin kubeconfig mode to", opts.KubeconfigMode)
+		os.Setenv("K3S_KUBECONFIG_MODE", opts.KubeconfigMode)
+	}
+
+	// these are mutually exclusive, should be better documented
+	if opts.InitHA {
+		log.Info("Generating a node token for additional control-plane instances")
+		token := util.GenerateHAToken()
+		log.Info("You can join new servers to the control-plane with the following token:", token) // this needs to be floated back up to the end of the CLI flow
+		os.Setenv("K3S_TOKEN", token)
+		opts.K3sExecArgs = opts.K3sExecArgs + " --cluster-init" // append --cluster-init to enable clustering (https://rancher.com/docs/k3s/latest/en/installation/ha-embedded/)
+	} else if opts.ServerURL != "" && opts.NodeToken != "" {
+		log.Info("Joining server at:", opts.ServerURL)
+		os.Setenv("K3S_URL", opts.ServerURL)
+		os.Setenv("K3S_TOKEN", opts.NodeToken)
+	}
+
+	if opts.K3sExecArgs != "" {
+		log.Infof("Applying extra k3s arguments: %q", opts.K3sExecArgs)
+		os.Setenv("INSTALL_K3S_EXEC", opts.K3sExecArgs)
+	}
 }

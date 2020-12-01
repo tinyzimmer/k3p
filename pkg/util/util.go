@@ -5,8 +5,14 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"os"
+	"time"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 // TempDir cast as a var to be overridden by CLI flags.
 var TempDir = os.TempDir()
@@ -34,4 +40,15 @@ func IsK8sObject(data map[string]interface{}) bool {
 		}
 	}
 	return true
+}
+
+var letterBytes = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+// GenerateHAToken will generate a token to be used to join additional servers to an HA cluster.
+func GenerateHAToken() string {
+	b := make([]byte, 128)
+	for i := range b {
+		b[i] = letterBytes[rand.Int63()%int64(len(letterBytes))]
+	}
+	return string(b)
 }
