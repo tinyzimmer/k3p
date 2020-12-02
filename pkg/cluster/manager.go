@@ -79,6 +79,9 @@ func (m *manager) AddNode(opts *types.AddNodeOptions) error {
 	cmd := fmt.Sprintf("sudo %s install %s --join https://%s:6443 --join-role %s --join-token %s",
 		ex, types.InstalledPackageFile, remoteAddr, string(opts.NodeRole), string(token),
 	)
+	if log.Verbose {
+		cmd = cmd + " --verbose"
+	}
 	log.Debug("Executing command on remote:", strings.Replace(cmd, string(token), "<redacted>", -1))
 	return session.Run(cmd)
 }
