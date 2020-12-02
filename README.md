@@ -75,9 +75,7 @@ Global Flags:
   -v, --verbose            Enable verbose logging
 ```
 
-### E2E
-
-#### Standalone
+### Standalone
 
 ```bash
 # Create the package on any machine
@@ -164,7 +162,7 @@ X-Real-Ip: 10.42.0.10
 [core@coreos1 ~]$ k3s-uninstall.sh 
 ```
 
-#### HA
+### HA
 
 ```bash
 # On the initial HA server
@@ -251,7 +249,7 @@ coreos2   Ready    etcd,master   62s     v1.19.4+k3s1   172.17.113.137   <none> 
 coreos3   Ready    etcd,master   48s     v1.19.4+k3s1   172.17.113.130   <none>        Fedora CoreOS 32.20201104.3.0   5.8.17-200.fc32.x86_64   containerd://1.4.1-k3s1
 ```
 
-#### Join new nodes remotely over SSH :wink:
+### Join new nodes remotely over SSH :wink:
 
 ```bash
 [core@coreos1 ~]$ sudo ./k3p node add --help
@@ -263,7 +261,7 @@ Usage:
 Flags:
   -h, --help                 help for add
   -r, --node-role string     Whether to join the instance as a 'server' or 'agent' (default "agent")
-  -k, --private-key string   A private key to use for SSH authentication
+  -k, --private-key string   A private key to use for SSH authentication, if not provided you will be prompted for a password
   -p, --ssh-port int         The port to use when connecting to the remote instance over SSH (default 22)
   -u, --ssh-user string      The remote user to use for SSH authentication (default "root")
 
@@ -272,7 +270,8 @@ Global Flags:
       --tmp-dir string     Override the default tmp directory (default "/tmp")
   -v, --verbose            Enable verbose logging
 
-[core@coreos1 ~]$ sudo ./k3p node add 172.17.113.137 -v --ssh-user core --private-key /var/home/core/.ssh/id_rsa 
+[core@coreos1 ~]$ sudo ./k3p node add 172.17.113.137 -v --ssh-user=core --private-key=/var/home/core/.ssh/id_rsa 
+
 [DEBUG] 2020/12/02 19:10:18 Default cache dir is "/root/.k3p/cache"
 [INFO] 2020/12/02 19:10:18 Determining current k3s external listening address
 [DEBUG] 2020/12/02 19:10:18 Scanning "/proc/83797/net/tcp" for remote port
@@ -302,4 +301,9 @@ Global Flags:
 [INFO]  systemd: Creating service file /etc/systemd/system/k3s-agent.service
 [INFO]  systemd: Enabling k3s-agent unit
 [INFO]  systemd: Starting k3s-agent
+
+[core@coreos1 ~]$ sudo kubectl get nodes
+NAME      STATUS   ROLES    AGE   VERSION
+coreos1   Ready    master   11m   v1.19.4+k3s1
+coreos2   Ready    <none>   59s   v1.19.4+k3s1
 ```
