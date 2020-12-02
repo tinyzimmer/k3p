@@ -111,7 +111,7 @@ func (b *builder) validateCheckSums(arch string) error {
 	for scanner.Scan() {
 
 		text := scanner.Text()
-		fmt.Println(text)
+
 		// file is structured as "<checksum> <remote filename>"
 		spl := strings.Fields(text)
 		if len(spl) != 2 {
