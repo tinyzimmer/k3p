@@ -16,7 +16,7 @@ import (
 
 const (
 	k3sScriptURL       = "https://get.k3s.io"
-	k3sReleasesRootURL = "https://github.com/rancher/k3s/releases"
+	k3sReleasesRootURL = "https://github.com/k3s-io/k3s/releases"
 )
 
 func (b *builder) downloadCoreK3sComponents(version, arch string) error {
@@ -111,7 +111,7 @@ func (b *builder) validateCheckSums(arch string) error {
 	for scanner.Scan() {
 
 		text := scanner.Text()
-
+		fmt.Println(text)
 		// file is structured as "<checksum> <remote filename>"
 		spl := strings.Fields(text)
 		if len(spl) != 2 {
