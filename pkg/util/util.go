@@ -46,7 +46,7 @@ var letterBytes = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01
 
 // GenerateHAToken will generate a token to be used to join additional servers to an HA cluster.
 func GenerateHAToken() string {
-	b := make([]byte, 128)
+	b := make([]byte, 256)
 	for i := range b {
 		b[i] = letterBytes[rand.Int63()%int64(len(letterBytes))]
 	}

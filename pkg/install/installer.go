@@ -2,9 +2,11 @@ package install
 
 import (
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
+	"strings"
 	"time"
 
 	v1 "github.com/tinyzimmer/k3p/pkg/build/archive/v1"
@@ -175,10 +177,20 @@ func configureK3sEnv(opts *types.InstallOptions) {
 	// these are mutually exclusive, should be better documented
 	if opts.InitHA {
 		log.Info("Generating a node token for additional control-plane instances")
-		token := util.GenerateHAToken()
+		var token string
+		if opts.NodeToken == "" {
+			token = util.GenerateHAToken()
+		}
+		log.Debug("Writing the contents of the token to /var/lib/rancher/k3s/server/server-token")
+		if err := ioutil.WriteFile("/var/lib/rancher/k3s/server/server-token", []byte(strings.TrimSpace(token)), 0600); err != nil {
+			// TODO: error handling, this is technically importants
+			log.Error("Failed to write the server join token to the filesystem. Be sure to copy it down for future reference.")
+			log.Error(err)
+		}
 		log.Info("You can join new servers to the control-plane with the following token:", token) // this needs to be floated back up to the end of the CLI flow
 		os.Setenv("K3S_TOKEN", token)
-		opts.K3sExecArgs = opts.K3sExecArgs + " --cluster-init" // append --cluster-init to enable clustering (https://rancher.com/docs/k3s/latest/en/installation/ha-embedded/)
+		// append --cluster-init to enable clustering (https://rancher.com/docs/k3s/latest/en/installation/ha-embedded/)
+		opts.K3sExecArgs = opts.K3sExecArgs + " --cluster-init"
 	} else if opts.ServerURL != "" && opts.NodeToken != "" {
 		log.Info("Joining server at:", opts.ServerURL)
 		os.Setenv("K3S_URL", opts.ServerURL)
