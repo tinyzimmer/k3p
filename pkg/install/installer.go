@@ -25,7 +25,28 @@ func New() types.Installer { return &installer{} }
 type installer struct{}
 
 func (i *installer) Install(opts *types.InstallOptions) error {
-	pkg, err := v1.Load(opts.TarPath)
+	log.Info("Copying the package to the rancher installation directory")
+	if err := os.MkdirAll(path.Dir(types.InstalledPackageFile), 0755); err != nil {
+		return err
+	}
+	f, err := os.Open(opts.TarPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	out, err := os.Create(types.InstalledPackageFile)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, f); err != nil {
+		return err
+	}
+	if err := out.Close(); err != nil {
+		return err
+	}
+
+	log.Infof("Extracting the archive")
+	pkg, err := v1.Load(types.InstalledPackageFile)
 	if err != nil {
 		return err
 	}
@@ -181,9 +202,9 @@ func configureK3sEnv(opts *types.InstallOptions) {
 		if opts.NodeToken == "" {
 			token = util.GenerateHAToken()
 		}
-		log.Debug("Writing the contents of the token to /var/lib/rancher/k3s/server/server-token")
-		if err := ioutil.WriteFile("/var/lib/rancher/k3s/server/server-token", []byte(strings.TrimSpace(token)), 0600); err != nil {
-			// TODO: error handling, this is technically importants
+		log.Debugf("Writing the contents of the token to %s", types.ServerTokenFile)
+		if err := ioutil.WriteFile(types.ServerTokenFile, []byte(strings.TrimSpace(token)), 0600); err != nil {
+			// TODO: error handling, this is technically important
 			log.Error("Failed to write the server join token to the filesystem. Be sure to copy it down for future reference.")
 			log.Error(err)
 		}

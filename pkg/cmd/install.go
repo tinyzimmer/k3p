@@ -24,7 +24,7 @@ func init() {
 	installCmd.Flags().BoolVar(&installOpts.AcceptEULA, "accept-eula", false, "Automatically accept any EULA included with the package")
 	installCmd.Flags().StringVarP(&installOpts.ServerURL, "join", "j", "", "When installing an agent instance, the address of the server to join (e.g. https://myserver:6443)")
 	installCmd.Flags().StringVarP(&nodeRole, "join-role", "r", "agent", `Specify whether to join the cluster as a "server" or "agent"`)
-	installCmd.Flags().StringVarP(&installOpts.NodeToken, "token", "t", "", `When installing an additional agent or server instance, the node token to use.
+	installCmd.Flags().StringVarP(&installOpts.NodeToken, "join-token", "t", "", `When installing an additional agent or server instance, the node token to use.
 
 For new agents, this can be retrieved with "k3p token get agent" or in 
 "/var/lib/rancher/k3s/server/node-token" on any of the server instances.
@@ -35,11 +35,15 @@ be used for registering new servers, instead of one being generated.
 `)
 	installCmd.Flags().StringVar(&installOpts.ResolvConf, "resolv-conf", "", "The path of a resolv-conf file to use when configuring DNS in the cluster")
 	installCmd.Flags().StringVar(&installOpts.KubeconfigMode, "kubeconfig-mode", "", "The mode to set on the k3s kubeconfig. Default is to only allow root access")
-	installCmd.Flags().StringVar(&installOpts.K3sExecArgs, "k3s-exec", "", "Extra arguments to pass to the k3s server or agent process")
+	installCmd.Flags().StringVar(&installOpts.K3sExecArgs, "k3s-exec", "", `
+Extra arguments to pass to the k3s server or agent process, for more details see:
+
+https://rancher.com/docs/k3s/latest/en/installation/install-options/server-config
+`)
 	installCmd.Flags().BoolVar(&installOpts.InitHA, "init-ha", false, `
 When set, this server will run with the --cluster-init flag to enable clustering, 
 and a token will be generated for adding additional servers to the cluster with 
-"--join-role server". You may optionally use the --token flag to provide a 
+"--join-role server". You may optionally use the --join-token flag to provide a 
 pre-generated one.`)
 
 	rootCmd.AddCommand(installCmd)

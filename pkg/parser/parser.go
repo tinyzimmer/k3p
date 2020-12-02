@@ -26,7 +26,7 @@ func NewManifestParser(parseDir string, excludeDirs []string, helmArgs string) t
 	// full list: https://github.com/kubernetes/client-go/blob/master/kubernetes/scheme/register.go
 	_ = corescheme.AddToScheme(sch)
 
-	base := &types.BaseManifestParser{
+	base := &BaseManifestParser{
 		ParseDir:     parseDir,
 		ExcludeDirs:  excludeDirs,
 		HelmArgs:     helmArgs,
@@ -37,7 +37,7 @@ func NewManifestParser(parseDir string, excludeDirs []string, helmArgs string) t
 
 // ManifestParser implements a types.ManifestParser that extracts image names from
 // raw kubernetes manifests.
-type ManifestParser struct{ *types.BaseManifestParser }
+type ManifestParser struct{ *BaseManifestParser }
 
 // ParseImages implements the types.ManifestParser interface. It walks the configured directory,
 // skipping those that are excluded. If a valid kubernetes yaml file is found, it is loaded

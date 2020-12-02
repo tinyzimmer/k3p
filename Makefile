@@ -14,5 +14,11 @@ dist-local: build
 		echo ; \
 	done < hack/hosts.txt
 
-node-shell-%:
-	ssh $(shell sed '$*q;d' hack/hosts.txt)
+CMD ?=
+shell-node-%:
+	ssh $(shell sed '$*q;d' hack/hosts.txt) $(CMD)
+
+clean-node-%:
+	$(MAKE) shell-node-$* CMD=k3s-uninstall.sh
+
+clean-node-all: clean-node-1 clean-node-2 clean-node-3

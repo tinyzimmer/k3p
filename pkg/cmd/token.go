@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/tinyzimmer/k3p/pkg/types"
 	"github.com/tinyzimmer/k3p/pkg/util"
 )
 
@@ -34,13 +35,13 @@ can only be retrieved on the server where "k3p install" was run with "--init-ha"
 	RunE: func(cmd *cobra.Command, args []string) error {
 		switch args[0] {
 		case "agent":
-			token, err := ioutil.ReadFile("/var/lib/rancher/k3s/server/node-token")
+			token, err := ioutil.ReadFile(types.AgentTokenFile)
 			if err != nil {
 				return err
 			}
 			fmt.Println(strings.TrimSpace(string(token)))
 		case "server":
-			token, err := ioutil.ReadFile("/var/lib/rancher/k3s/server/server-token")
+			token, err := ioutil.ReadFile(types.ServerTokenFile)
 			if err != nil {
 				return err
 			}

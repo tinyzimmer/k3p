@@ -250,3 +250,56 @@ coreos1   Ready    etcd,master   3m51s   v1.19.4+k3s1   172.17.113.136   <none> 
 coreos2   Ready    etcd,master   62s     v1.19.4+k3s1   172.17.113.137   <none>        Fedora CoreOS 32.20201104.3.0   5.8.17-200.fc32.x86_64   containerd://1.4.1-k3s1
 coreos3   Ready    etcd,master   48s     v1.19.4+k3s1   172.17.113.130   <none>        Fedora CoreOS 32.20201104.3.0   5.8.17-200.fc32.x86_64   containerd://1.4.1-k3s1
 ```
+
+#### Join new nodes remotely over SSH :wink:
+
+```bash
+[core@coreos1 ~]$ sudo ./k3p node add --help
+Add a new node to the cluster
+
+Usage:
+  k3p node add NODE [flags]
+
+Flags:
+  -h, --help                 help for add
+  -r, --node-role string     Whether to join the instance as a 'server' or 'agent' (default "agent")
+  -k, --private-key string   A private key to use for SSH authentication
+  -p, --ssh-port int         The port to use when connecting to the remote instance over SSH (default 22)
+  -u, --ssh-user string      The remote user to use for SSH authentication (default "root")
+
+Global Flags:
+      --cache-dir string   Override the default location for cached k3s assets (default "/root/.k3p/cache")
+      --tmp-dir string     Override the default tmp directory (default "/tmp")
+  -v, --verbose            Enable verbose logging
+
+[core@coreos1 ~]$ sudo ./k3p node add 172.17.113.137 -v --ssh-user core --private-key /var/home/core/.ssh/id_rsa 
+[DEBUG] 2020/12/02 19:10:18 Default cache dir is "/root/.k3p/cache"
+[INFO] 2020/12/02 19:10:18 Determining current k3s external listening address
+[DEBUG] 2020/12/02 19:10:18 Scanning "/proc/83797/net/tcp" for remote port
+[DEBUG] 2020/12/02 19:10:18 K3s is listening on 172.17.113.136
+[INFO] 2020/12/02 19:10:18 Connecting to server 172.17.113.137 on port 22
+[DEBUG] 2020/12/02 19:10:18 Using SSH user: core
+[DEBUG] 2020/12/02 19:10:18 Using SSH pubkey authentication
+[DEBUG] 2020/12/02 19:10:18 Loading SSH key from "/var/home/core/.ssh/id_rsa"
+[DEBUG] 2020/12/02 19:10:18 Creating SSH connection with 172.17.113.137:22 over TCP
+[INFO] 2020/12/02 19:10:18 Copying package manifest to the new node
+[DEBUG] 2020/12/02 19:10:18 Executing command on remote: mkdir -p /var/lib/rancher/k3s/server
+[DEBUG] 2020/12/02 19:10:18 Executing command on remote: sudo tee /var/lib/rancher/k3s/server/package.tar
+[INFO] 2020/12/02 19:10:21 Copying the k3p binary to the new node
+[DEBUG] 2020/12/02 19:10:21 Executing command on remote: mkdir -p /var/home/core
+[DEBUG] 2020/12/02 19:10:21 Executing command on remote: sudo tee /var/home/core/k3p
+[DEBUG] 2020/12/02 19:10:21 Reading agent join token from /var/lib/rancher/k3s/server/node-token
+[INFO] 2020/12/02 19:10:21 Joining new server instance at 172.17.113.137
+[DEBUG] 2020/12/02 19:10:21 Executing command on remote: sudo /var/home/core/k3p install /var/lib/rancher/k3s/server/package.tar --join https://172.17.113.136:6443 --join-role agent --join-token <redacted>
+[INFO]  Skipping k3s download and verify
+[INFO]  Skipping installation of SELinux RPM
+[INFO]  Skipping /usr/local/bin/kubectl symlink to k3s, already exists
+[INFO]  Skipping /usr/local/bin/crictl symlink to k3s, already exists
+[INFO]  Skipping /usr/local/bin/ctr symlink to k3s, command exists in PATH at /usr/bin/ctr
+[INFO]  Creating killall script /usr/local/bin/k3s-killall.sh
+[INFO]  Creating uninstall script /usr/local/bin/k3s-agent-uninstall.sh
+[INFO]  env: Creating environment file /etc/systemd/system/k3s-agent.service.env
+[INFO]  systemd: Creating service file /etc/systemd/system/k3s-agent.service
+[INFO]  systemd: Enabling k3s-agent unit
+[INFO]  systemd: Starting k3s-agent
+```

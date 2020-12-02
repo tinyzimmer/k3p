@@ -1,5 +1,17 @@
 package types
 
+// ServerTokenFile is the file where the secret token is written for joining
+// new control-plane instances in an HA setup.
+const ServerTokenFile = "/var/lib/rancher/k3s/server/server-token"
+
+// AgentTokenFile is the file where the secret token is written for joining
+// new agents to the cluster
+const AgentTokenFile = "/var/lib/rancher/k3s/server/node-token"
+
+// InstalledPackageFile is the file where the original tarball is copied
+// during the installation.
+const InstalledPackageFile = "/var/lib/rancher/k3s/server/package.tar"
+
 // Installer is an interface for laying a package manifest down on a system
 // and setting up K3s.
 type Installer interface {
