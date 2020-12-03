@@ -15,10 +15,6 @@ import (
 	"github.com/tinyzimmer/k3p/pkg/util"
 )
 
-const k3sManifestsDir = "/var/lib/rancher/k3s/server/manifests"
-const k3sImagesDir = "/var/lib/rancher/k3s/agent/images"
-const k3sScriptdir = "/usr/local/bin/k3p"
-
 // New returns a new package installer.
 func New() types.Installer { return &installer{} }
 
@@ -89,7 +85,7 @@ func (i *installer) Install(opts *types.InstallOptions) error {
 	configureK3sEnv(opts)
 
 	log.Info("Running k3s installation script")
-	cmd := exec.Command("/bin/sh", path.Join(k3sScriptdir, "install.sh"), string(opts.K3sRole))
+	cmd := exec.Command("/bin/sh", path.Join(types.K3sScriptsDir, "install.sh"), string(opts.K3sRole))
 
 	outPipe, err := cmd.StdoutPipe()
 	if err != nil {
@@ -107,61 +103,67 @@ func (i *installer) Install(opts *types.InstallOptions) error {
 }
 
 func (i *installer) installManifest(manifest *types.PackageManifest) error {
-	log.Info("Installing binaries to /usr/local/bin/")
+	log.Info("Installing binaries to", types.K3sBinDir)
 	for _, bin := range manifest.Bins {
 		defer bin.Body.Close()
-		f, err := os.OpenFile(path.Join("/usr/local/bin", bin.Name), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+		f, err := os.OpenFile(path.Join(types.K3sBinDir, bin.Name), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 		if err != nil {
 			return err
 		}
-		defer f.Close()
 		log.Debugf("Writing %q to %q", bin.Name, f.Name())
 		if _, err := io.Copy(f, bin.Body); err != nil {
 			return err
 		}
+		if err := f.Close(); err != nil {
+			return err
+		}
 	}
 
-	log.Info("Installing scripts to", k3sScriptdir)
-	if err := os.MkdirAll(k3sScriptdir, 0755); err != nil {
+	log.Info("Installing scripts to", types.K3sScriptsDir)
+	if err := os.MkdirAll(types.K3sScriptsDir, 0755); err != nil {
 		return err
 	}
 	for _, script := range manifest.Scripts {
 		defer script.Body.Close()
-		f, err := os.Create(path.Join(k3sScriptdir, script.Name))
+		f, err := os.Create(path.Join(types.K3sScriptsDir, script.Name))
 		if err != nil {
 			return err
 		}
-		defer f.Close()
 		log.Debugf("Writing %q to %q", script.Name, f.Name())
 		if _, err := io.Copy(f, script.Body); err != nil {
 			return err
 		}
+		if err := f.Close(); err != nil {
+			return err
+		}
 	}
 
-	log.Info("Installing images to", k3sImagesDir)
-	if err := os.MkdirAll(k3sImagesDir, 0755); err != nil {
+	log.Info("Installing images to", types.K3sImagesDir)
+	if err := os.MkdirAll(types.K3sImagesDir, 0755); err != nil {
 		return err
 	}
 	for _, img := range manifest.Images {
 		defer img.Body.Close()
-		f, err := os.Create(path.Join(k3sImagesDir, img.Name))
+		f, err := os.Create(path.Join(types.K3sImagesDir, img.Name))
 		if err != nil {
 			return err
 		}
-		defer f.Close()
 		log.Debugf("Writing %q to %q", img.Name, f.Name())
 		if _, err := io.Copy(f, img.Body); err != nil {
 			return err
 		}
+		if err := f.Close(); err != nil {
+			return err
+		}
 	}
 
-	log.Info("Installing kubernetes manifests to", k3sManifestsDir)
-	if err := os.MkdirAll(k3sManifestsDir, 0755); err != nil {
+	log.Info("Installing kubernetes manifests to", types.K3sManifestsDir)
+	if err := os.MkdirAll(types.K3sManifestsDir, 0755); err != nil {
 		return err
 	}
 	for _, mani := range manifest.Manifests {
 		defer mani.Body.Close()
-		out := path.Join(k3sManifestsDir, mani.Name)
+		out := path.Join(types.K3sManifestsDir, mani.Name)
 		if err := os.MkdirAll(path.Dir(out), 0755); err != nil {
 			return err
 		}
@@ -169,9 +171,11 @@ func (i *installer) installManifest(manifest *types.PackageManifest) error {
 		if err != nil {
 			return err
 		}
-		defer f.Close()
 		log.Debugf("Writing %q to %q", mani.Name, f.Name())
 		if _, err := io.Copy(f, mani.Body); err != nil {
+			return err
+		}
+		if err := f.Close(); err != nil {
 			return err
 		}
 	}

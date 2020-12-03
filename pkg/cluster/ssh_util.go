@@ -4,39 +4,117 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"os"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
+
+	scp "github.com/bramvdbogaerde/go-scp"
 	"golang.org/x/crypto/ssh"
 )
 
-func sshSyncFile(client *ssh.Client, file string) error {
-	session, err := client.NewSession()
+func newScpClient(client *ssh.Client) (scp.Client, error) {
+	scpClient, err := scp.NewClientBySSH(client)
+	if err != nil {
+		return scp.Client{}, err
+	}
+	scpClient.RemoteBinary = "sudo scp"
+	return scpClient, nil
+}
+
+func sshSyncManifest(client *ssh.Client, manifest *types.PackageManifest) error {
+	log.Info("Installing binaries to remote machine at", types.K3sBinDir)
+	if err := sshMkdirAll(client, types.K3sBinDir); err != nil {
+		return err
+	}
+	for _, bin := range manifest.Bins {
+		defer bin.Body.Close()
+		scpClient, err := newScpClient(client)
+		if err != nil {
+			return err
+		}
+		defer scpClient.Close()
+		destPath := path.Join(types.K3sBinDir, bin.Name)
+		log.Debugf("Sending %d bytes of %q to %q and setting mode to 0755", bin.Size, bin.Name, destPath)
+		if err := scpClient.Copy(bin.Body, destPath, "0755", bin.Size); err != nil {
+			return err
+		}
+	}
+
+	log.Info("Installing scripts to remote machine at", types.K3sScriptsDir)
+	if err := sshMkdirAll(client, types.K3sScriptsDir); err != nil {
+		return err
+	}
+	for _, script := range manifest.Scripts {
+		defer script.Body.Close()
+		scpClient, err := newScpClient(client)
+		if err != nil {
+			return err
+		}
+		defer scpClient.Close()
+		destPath := path.Join(types.K3sScriptsDir, script.Name)
+		log.Debugf("Sending %d bytes of %q to %q and setting mode to 0755", script.Size, script.Name, destPath)
+		if err := scpClient.Copy(script.Body, destPath, "0755", script.Size); err != nil {
+			return err
+		}
+	}
+
+	log.Info("Installing images to remote machine at", types.K3sImagesDir)
+	if err := sshMkdirAll(client, types.K3sImagesDir); err != nil {
+		return err
+	}
+	for _, imgs := range manifest.Images {
+		defer imgs.Body.Close()
+		scpClient, err := newScpClient(client)
+		if err != nil {
+			return err
+		}
+		defer scpClient.Close()
+		destPath := path.Join(types.K3sImagesDir, imgs.Name)
+		log.Debugf("Sending %d bytes of %q to %q and setting mode to 0644", imgs.Size, imgs.Name, destPath)
+		if err := scpClient.Copy(imgs.Body, destPath, "0644", imgs.Size); err != nil {
+			return err
+		}
+	}
+
+	log.Info("Installing manifests to remote machine at", types.K3sManifestsDir)
+	if err := sshMkdirAll(client, types.K3sManifestsDir); err != nil {
+		return err
+	}
+	for _, mani := range manifest.Manifests {
+		defer mani.Body.Close()
+		if len(strings.Split(mani.Name, "/")) > 1 {
+			base := path.Join(types.K3sManifestsDir, path.Dir(mani.Name))
+			if err := sshMkdirAll(client, base); err != nil {
+				return err
+			}
+		}
+		scpClient, err := newScpClient(client)
+		if err != nil {
+			return err
+		}
+		defer scpClient.Close()
+		destPath := path.Join(types.K3sManifestsDir, mani.Name)
+		log.Debugf("Sending %d bytes of %q to %q and setting mode to 0644", mani.Size, mani.Name, destPath)
+		if err := scpClient.Copy(mani.Body, destPath, "0644", mani.Size); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func sshMkdirAll(client *ssh.Client, dir string) error {
+	sess, err := client.NewSession()
 	if err != nil {
 		return err
 	}
-	defer session.Close()
-	cmd := fmt.Sprintf("mkdir -p %s", path.Dir(file))
-	log.Debug("Executing command on remote:", cmd)
-	if err := session.Run(cmd); err != nil {
-		return err
-	}
-	session, err = client.NewSession()
-	if err != nil {
-		return err
-	}
-	defer session.Close()
-	in, err := os.Open(file)
-	if err != nil {
-		return err
-	}
-	session.Stdin = in
-	cmd = fmt.Sprintf("sudo tee %s", file)
-	log.Debug("Executing command on remote:", cmd)
-	return session.Run(cmd)
+	defer sess.Close()
+	cmd := fmt.Sprintf("sudo mkdir -p %s", dir)
+	log.Debug("Running command on remote:", cmd)
+	return sess.Run(cmd)
 }
 
 func getSSHClient(opts *types.AddNodeOptions) (*ssh.Client, error) {

@@ -10,7 +10,19 @@ const AgentTokenFile = "/var/lib/rancher/k3s/server/node-token"
 
 // InstalledPackageFile is the file where the original tarball is copied
 // during the installation.
-const InstalledPackageFile = "/var/lib/rancher/k3s/server/package.tar"
+const InstalledPackageFile = "/var/lib/rancher/k3s/data/package.tar"
+
+// K3sManifestsDir is the directory where manifests are installed for k3s to pre-load on boot.
+const K3sManifestsDir = "/var/lib/rancher/k3s/server/manifests"
+
+// K3sImagesDir is the directory where images are pre-loaded on a server or agent.
+const K3sImagesDir = "/var/lib/rancher/k3s/agent/images"
+
+// K3sScriptsDir is the directory where scripts are installed to the system.
+const K3sScriptsDir = "/usr/local/bin/k3p-scripts"
+
+// K3sBinDir is the directory where binaries are installed to the system.
+const K3sBinDir = "/usr/local/bin"
 
 // Installer is an interface for laying a package manifest down on a system
 // and setting up K3s.
