@@ -37,7 +37,7 @@ func sshSyncManifest(client *ssh.Client, manifest *types.PackageManifest) error 
 		}
 		defer scpClient.Close()
 		destPath := path.Join(types.K3sBinDir, bin.Name)
-		log.Debugf("Sending %d bytes of %q to %q and setting mode to 0755", bin.Size, bin.Name, destPath)
+		log.Debugf("Sending %d bytes of %q to %q and setting mode to 0755\n", bin.Size, bin.Name, destPath)
 		if err := scpClient.Copy(bin.Body, destPath, "0755", bin.Size); err != nil {
 			return err
 		}
@@ -55,7 +55,7 @@ func sshSyncManifest(client *ssh.Client, manifest *types.PackageManifest) error 
 		}
 		defer scpClient.Close()
 		destPath := path.Join(types.K3sScriptsDir, script.Name)
-		log.Debugf("Sending %d bytes of %q to %q and setting mode to 0755", script.Size, script.Name, destPath)
+		log.Debugf("Sending %d bytes of %q to %q and setting mode to 0755\n", script.Size, script.Name, destPath)
 		if err := scpClient.Copy(script.Body, destPath, "0755", script.Size); err != nil {
 			return err
 		}
@@ -73,7 +73,7 @@ func sshSyncManifest(client *ssh.Client, manifest *types.PackageManifest) error 
 		}
 		defer scpClient.Close()
 		destPath := path.Join(types.K3sImagesDir, imgs.Name)
-		log.Debugf("Sending %d bytes of %q to %q and setting mode to 0644", imgs.Size, imgs.Name, destPath)
+		log.Debugf("Sending %d bytes of %q to %q and setting mode to 0644\n", imgs.Size, imgs.Name, destPath)
 		if err := scpClient.Copy(imgs.Body, destPath, "0644", imgs.Size); err != nil {
 			return err
 		}
@@ -97,7 +97,7 @@ func sshSyncManifest(client *ssh.Client, manifest *types.PackageManifest) error 
 		}
 		defer scpClient.Close()
 		destPath := path.Join(types.K3sManifestsDir, mani.Name)
-		log.Debugf("Sending %d bytes of %q to %q and setting mode to 0644", mani.Size, mani.Name, destPath)
+		log.Debugf("Sending %d bytes of %q to %q and setting mode to 0644\n", mani.Size, mani.Name, destPath)
 		if err := scpClient.Copy(mani.Body, destPath, "0644", mani.Size); err != nil {
 			return err
 		}
@@ -130,7 +130,7 @@ func getSSHClient(opts *types.AddNodeOptions) (*ssh.Client, error) {
 	}
 	if opts.SSHKeyFile != "" {
 		log.Debug("Using SSH pubkey authentication")
-		log.Debugf("Loading SSH key from %q", opts.SSHKeyFile)
+		log.Debugf("Loading SSH key from %q\n", opts.SSHKeyFile)
 		keyBytes, err := ioutil.ReadFile(opts.SSHKeyFile)
 		if err != nil {
 			return nil, err
@@ -143,6 +143,6 @@ func getSSHClient(opts *types.AddNodeOptions) (*ssh.Client, error) {
 	}
 
 	addr := net.JoinHostPort(opts.NodeAddress, strconv.Itoa(opts.SSHPort))
-	log.Debugf("Creating SSH connection with %s over TCP", addr)
+	log.Debugf("Creating SSH connection with %s over TCP\n", addr)
 	return ssh.Dial("tcp", addr, config)
 }

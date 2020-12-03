@@ -29,10 +29,10 @@ The k3p command provides an easy method for packaging a kubernetes environment i
 	SilenceErrors:     true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if cacheDir != cache.DefaultCache.CacheDir() {
-			log.Debugf("Setting cache dir to %q", cacheDir)
+			log.Debugf("Setting cache dir to %q\n", cacheDir)
 			cache.DefaultCache = cache.New(cacheDir)
 		} else {
-			log.Debugf("Default cache dir is %q", cache.DefaultCache.CacheDir())
+			log.Debugf("Default cache dir is %q\n", cache.DefaultCache.CacheDir())
 		}
 	},
 }

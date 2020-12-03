@@ -2,9 +2,7 @@ package cluster
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
-	"os"
 	"path"
 	"strings"
 
@@ -36,10 +34,11 @@ func (m *manager) AddNode(opts *types.AddNodeOptions) error {
 	// Loading it locally and sending it in pieces works for now.
 	log.Info("Loading package manifest")
 	pkg, err := v1.Load(types.InstalledPackageFile)
-	defer pkg.Close()
 	if err != nil {
 		return err
 	}
+	defer pkg.Close()
+
 	manifest, err := pkg.GetManifest()
 	if err != nil {
 		return err
@@ -62,7 +61,7 @@ func (m *manager) AddNode(opts *types.AddNodeOptions) error {
 	}
 	tokenStr := string(token)
 
-	log.Infof("Connecting to server %s on port %d", opts.NodeAddress, opts.SSHPort)
+	log.Infof("Connecting to server %s on port %d\n", opts.NodeAddress, opts.SSHPort)
 	client, err := getSSHClient(opts)
 	if err != nil {
 		return err
@@ -73,7 +72,7 @@ func (m *manager) AddNode(opts *types.AddNodeOptions) error {
 		return err
 	}
 
-	log.Infof("Joining instance as a new %s", opts.NodeRole)
+	log.Infof("Joining instance as a new %s\n", opts.NodeRole)
 	session, err := client.NewSession()
 	if err != nil {
 		return err
@@ -88,8 +87,10 @@ func (m *manager) AddNode(opts *types.AddNodeOptions) error {
 	if err != nil {
 		return err
 	}
-	go io.Copy(os.Stdout, outPipe)
-	go io.Copy(os.Stdout, errPipe)
+
+	go log.TailReader("K3S", outPipe)
+	go log.TailReader("K3S", errPipe)
+
 	cmd := buildInstallCmd(remoteAddr, tokenStr, string(opts.NodeRole))
 	log.Debug("Executing command on remote:", strings.Replace(cmd, tokenStr, "<redacted>", -1))
 	return session.Run(cmd)
@@ -97,7 +98,7 @@ func (m *manager) AddNode(opts *types.AddNodeOptions) error {
 
 func buildInstallCmd(remoteAddr, token, nodeRole string) string {
 	installCmd := fmt.Sprintf(
-		`/bin/sh -c 'INSTALL_K3S_SKIP_DOWNLOAD="true" K3S_URL="https://%s:6443" K3S_TOKEN="%s" %s %s'`,
+		`sudo sh -c 'INSTALL_K3S_SKIP_DOWNLOAD="true" K3S_URL="https://%s:6443" K3S_TOKEN="%s" %s %s'`,
 		remoteAddr, token, path.Join(types.K3sScriptsDir, "install.sh"), nodeRole,
 	)
 	return installCmd

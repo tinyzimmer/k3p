@@ -1,20 +1,61 @@
 package log
 
 import (
-	glog "log"
-	"os"
+	"bufio"
+	"fmt"
+	"io"
+	"strings"
+	"time"
 )
 
 // Verbose is set by the CLI flag to enable debug logging
 var Verbose bool
 
-var infoLogger, warningLogger, errorLogger, debugLogger *glog.Logger
+type logger struct{ level string }
+
+func (l *logger) getLevel() string {
+	if l.level != "" {
+		return fmt.Sprintf("[%s]", l.level)
+	}
+	return ""
+}
+
+func (l *logger) getTime() string {
+	return time.Now().Local().Format("2006/01/02 15:04:05")
+}
+
+func (l *logger) seedLine() {
+	fmt.Print(l.getTime(), "  ", l.getLevel(), "\t")
+}
+
+func (l *logger) Println(args ...interface{}) {
+	l.seedLine()
+	fmt.Println(args...)
+}
+
+func (l *logger) Printf(fstr string, args ...interface{}) {
+	l.seedLine()
+	fmt.Printf(fstr, args...)
+}
+
+var infoLogger, warningLogger, errorLogger, debugLogger *logger
 
 func init() {
-	infoLogger = glog.New(os.Stderr, "[INFO] ", glog.Ldate|glog.Ltime)
-	warningLogger = glog.New(os.Stderr, "[WARNING] ", glog.Ldate|glog.Ltime)
-	errorLogger = glog.New(os.Stderr, "[ERROR] ", glog.Ldate|glog.Ltime)
-	debugLogger = glog.New(os.Stderr, "[DEBUG] ", glog.Ldate|glog.Ltime)
+	infoLogger = &logger{"INFO"}
+	warningLogger = &logger{"WARNING"}
+	errorLogger = &logger{"ERROR"}
+	debugLogger = &logger{"DEBUG"}
+}
+
+// TailReader will follow the given reader and send its contents
+// to the INFO logger.
+func TailReader(prefix string, rdr io.Reader) {
+	l := &logger{prefix}
+	scanner := bufio.NewScanner(rdr)
+	for scanner.Scan() {
+		text := scanner.Text()
+		l.Println(strings.TrimSpace(text))
+	}
 }
 
 // Info is the equivalent of a log.Println on the info logger.
@@ -58,5 +99,15 @@ func Debug(args ...interface{}) {
 func Debugf(fstr string, args ...interface{}) {
 	if Verbose {
 		debugLogger.Printf(fstr, args...)
+	}
+}
+
+// DebugReader is a convenience method for tailing the contents of a reader
+// to the debug logger.
+func DebugReader(rdr io.Reader) {
+	scanner := bufio.NewScanner(rdr)
+	for scanner.Scan() {
+		text := scanner.Text()
+		Debug(strings.TrimSpace(text))
 	}
 }

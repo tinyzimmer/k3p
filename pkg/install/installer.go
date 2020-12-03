@@ -41,7 +41,7 @@ func (i *installer) Install(opts *types.InstallOptions) error {
 		return err
 	}
 
-	log.Infof("Extracting the archive")
+	log.Info("Extracting the archive")
 	pkg, err := v1.Load(types.InstalledPackageFile)
 	if err != nil {
 		return err
@@ -96,8 +96,8 @@ func (i *installer) Install(opts *types.InstallOptions) error {
 		return err
 	}
 
-	go io.Copy(os.Stdout, outPipe)
-	go io.Copy(os.Stderr, errPipe)
+	go log.TailReader("K3S", outPipe)
+	go log.TailReader("K3S", errPipe)
 
 	return cmd.Run()
 }
@@ -110,7 +110,7 @@ func (i *installer) installManifest(manifest *types.PackageManifest) error {
 		if err != nil {
 			return err
 		}
-		log.Debugf("Writing %q to %q", bin.Name, f.Name())
+		log.Debugf("Writing %q to %q\n", bin.Name, f.Name())
 		if _, err := io.Copy(f, bin.Body); err != nil {
 			return err
 		}
@@ -129,7 +129,7 @@ func (i *installer) installManifest(manifest *types.PackageManifest) error {
 		if err != nil {
 			return err
 		}
-		log.Debugf("Writing %q to %q", script.Name, f.Name())
+		log.Debugf("Writing %q to %q\n", script.Name, f.Name())
 		if _, err := io.Copy(f, script.Body); err != nil {
 			return err
 		}
@@ -148,7 +148,7 @@ func (i *installer) installManifest(manifest *types.PackageManifest) error {
 		if err != nil {
 			return err
 		}
-		log.Debugf("Writing %q to %q", img.Name, f.Name())
+		log.Debugf("Writing %q to %q\n", img.Name, f.Name())
 		if _, err := io.Copy(f, img.Body); err != nil {
 			return err
 		}
@@ -171,7 +171,7 @@ func (i *installer) installManifest(manifest *types.PackageManifest) error {
 		if err != nil {
 			return err
 		}
-		log.Debugf("Writing %q to %q", mani.Name, f.Name())
+		log.Debugf("Writing %q to %q\n", mani.Name, f.Name())
 		if _, err := io.Copy(f, mani.Body); err != nil {
 			return err
 		}
@@ -206,7 +206,7 @@ func configureK3sEnv(opts *types.InstallOptions) {
 		if opts.NodeToken == "" {
 			token = util.GenerateHAToken()
 		}
-		log.Debugf("Writing the contents of the token to %s", types.ServerTokenFile)
+		log.Debugf("Writing the contents of the token to %s\n", types.ServerTokenFile)
 		if err := ioutil.WriteFile(types.ServerTokenFile, []byte(strings.TrimSpace(token)), 0600); err != nil {
 			// TODO: error handling, this is technically important
 			log.Error("Failed to write the server join token to the filesystem. Be sure to copy it down for future reference.")
@@ -223,7 +223,7 @@ func configureK3sEnv(opts *types.InstallOptions) {
 	}
 
 	if opts.K3sExecArgs != "" {
-		log.Infof("Applying extra k3s arguments: %q", opts.K3sExecArgs)
+		log.Infof("Applying extra k3s arguments: %q\n", opts.K3sExecArgs)
 		os.Setenv("INSTALL_K3S_EXEC", opts.K3sExecArgs)
 	}
 }

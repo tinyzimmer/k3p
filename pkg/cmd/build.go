@@ -14,14 +14,7 @@ import (
 )
 
 var (
-	buildHelmArgs    string
-	buildK3sVersion  string
-	buildManifestDir string
-	buildExcludeDirs []string
-	buildArch        string
-	buildImageFile   string
-	buildEULAFile    string
-	buildOutput      string
+	buildOpts *types.BuildOptions
 )
 
 func init() {
@@ -30,14 +23,17 @@ func init() {
 		log.Fatal(err)
 	}
 
-	buildCmd.Flags().StringVarP(&buildK3sVersion, "version", "V", types.VersionLatest, "The k3s version to bundle with the package")
-	buildCmd.Flags().StringVarP(&buildManifestDir, "manifests", "m", cwd, "The directory to scan for kubernetes manifests and charts, defaults to the current directory")
-	buildCmd.Flags().StringVarP(&buildHelmArgs, "helm-args", "H", "", "Arguments to pass to the 'helm template' command when searching for images")
-	buildCmd.Flags().StringSliceVarP(&buildExcludeDirs, "exclude", "e", []string{}, "Directories to exclude when reading the manifest directory")
-	buildCmd.Flags().StringVarP(&buildArch, "arch", "a", runtime.GOARCH, "The architecture to package the distribution for. Only (amd64, arm, and arm64 are supported)")
-	buildCmd.Flags().StringVarP(&buildImageFile, "images", "i", "", "A file containing a list of extra images to bundle with the archive")
-	buildCmd.Flags().StringVarP(&buildEULAFile, "eula", "E", "", "A file containing an End User License Agreement to display to the user upon installing the package")
-	buildCmd.Flags().StringVarP(&buildOutput, "output", "o", path.Join(cwd, "package.tar"), "The file to save the distribution package to")
+	buildOpts = &types.BuildOptions{}
+
+	buildCmd.Flags().StringVarP(&buildOpts.K3sVersion, "version", "V", types.VersionLatest, "A specific k3s version to bundle with the package, overrides --channel")
+	buildCmd.Flags().StringVarP(&buildOpts.K3sChannel, "channel", "c", "stable", "The release channel to retrieve the version of k3s from")
+	buildCmd.Flags().StringVarP(&buildOpts.ManifestDir, "manifests", "m", cwd, "The directory to scan for kubernetes manifests and charts, defaults to the current directory")
+	buildCmd.Flags().StringVarP(&buildOpts.HelmArgs, "helm-args", "H", "", "Arguments to pass to the 'helm template' command when searching for images")
+	buildCmd.Flags().StringSliceVarP(&buildOpts.Excludes, "exclude", "e", []string{}, "Directories to exclude when reading the manifest directory")
+	buildCmd.Flags().StringVarP(&buildOpts.Arch, "arch", "a", runtime.GOARCH, "The architecture to package the distribution for. Only (amd64, arm, and arm64 are supported)")
+	buildCmd.Flags().StringVarP(&buildOpts.ImageFile, "images", "i", "", "A file containing a list of extra images to bundle with the archive")
+	buildCmd.Flags().StringVarP(&buildOpts.EULAFile, "eula", "E", "", "A file containing an End User License Agreement to display to the user upon installing the package")
+	buildCmd.Flags().StringVarP(&buildOpts.Output, "output", "o", path.Join(cwd, "package.tar"), "The file to save the distribution package to")
 	buildCmd.Flags().BoolVarP(&cache.NoCache, "no-cache", "N", false, "Disable the use of the local cache when downloading assets.")
 
 	rootCmd.AddCommand(buildCmd)
@@ -51,15 +47,6 @@ var buildCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return builder.Build(&types.BuildOptions{
-			K3sVersion:  buildK3sVersion,
-			Arch:        buildArch,
-			ImageFile:   buildImageFile,
-			EULAFile:    buildEULAFile,
-			ManifestDir: buildManifestDir,
-			HelmArgs:    buildHelmArgs,
-			Excludes:    buildExcludeDirs,
-			Output:      buildOutput,
-		})
+		return builder.Build(buildOpts)
 	},
 }

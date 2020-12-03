@@ -44,9 +44,7 @@ func (p *ManifestParser) detectImagesFromHelmChart(chartPath string) ([]string, 
 
 	args := []string{"template", chartPath}
 	if helmArgs := p.GetHelmArgs(); helmArgs != "" {
-		for _, arg := range strings.Fields(helmArgs) {
-			args = append(args, arg)
-		}
+		args = append(args, strings.Fields(helmArgs)...)
 	}
 
 	log.Debugf("Executing command: helm %s", strings.Join(args, " "))
@@ -121,6 +119,9 @@ func (p *ManifestParser) packageHelmChartToManifest(chartPath string) (*types.Ar
 		return nil, err
 	}
 	files, err := ioutil.ReadDir(tmpDir)
+	if err != nil {
+		return nil, err
+	}
 	if len(files) != 1 {
 		return nil, errors.New("helm package command produced more or less than 1 one artifact")
 	}

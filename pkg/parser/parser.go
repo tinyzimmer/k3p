@@ -119,7 +119,7 @@ func (p *ManifestParser) ParseManifests() ([]*types.Artifact, error) {
 				return filepath.SkipDir
 			}
 			if isHelmChart(file) {
-				log.Infof("Packaging helm chart: %q", file)
+				log.Infof("Packaging helm chart: %q\n", file)
 				artifact, err := p.packageHelmChartToManifest(file)
 				if err != nil {
 					return err
@@ -166,11 +166,11 @@ func (p *ManifestParser) ParseManifests() ([]*types.Artifact, error) {
 
 		// if the file doesn't appear valid, continue
 		if !fileIsValid {
-			log.Warningf("Skipping %q since it contains invalid kubernetes yaml", file)
+			log.Warningf("Skipping %q since it contains invalid kubernetes yaml\n", file)
 			return nil
 		}
 
-		log.Infof("Detected kubernetes manifest: %q", file)
+		log.Infof("Detected kubernetes manifest: %q\n", file)
 
 		// queue up the artifact
 		f, err := os.Open(file)

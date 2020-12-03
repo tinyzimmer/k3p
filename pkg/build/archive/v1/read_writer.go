@@ -42,7 +42,7 @@ func Load(tarPath string) (types.BundleReadWriter, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("Using temp dir: %q", workdir)
+	log.Debugf("Using temp dir: %q\n", workdir)
 
 	// Extract the contents of the archive into the workdir
 	tarReader := tar.NewReader(f)
@@ -164,7 +164,11 @@ func (rw *readWriter) ArchiveTo(path string) error {
 	tw := tar.NewWriter(f)
 	defer tw.Close()
 
-	return filepath.Walk(rw.workDir, func(file string, fileInfo os.FileInfo, err error) error {
+	return filepath.Walk(rw.workDir, func(file string, fileInfo os.FileInfo, lastErr error) error {
+		if lastErr != nil {
+			return lastErr
+		}
+
 		// skip the root directory
 		if file == rw.workDir {
 			return nil

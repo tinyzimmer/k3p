@@ -75,7 +75,7 @@ func (h *httpCache) Clean() error {
 func (h *httpCache) Get(url string) (io.ReadCloser, error) {
 	// If cache is setup check it first
 	if !NoCache && h.cacheDir != "" {
-		log.Debugf("Checking local cache for the contents of %q", url)
+		log.Debugf("Checking local cache for the contents of %q\n", url)
 		cacheName, err := util.CalculateSHA256Sum(strings.NewReader(url))
 		if err != nil {
 			return nil, err

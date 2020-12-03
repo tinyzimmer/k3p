@@ -2,6 +2,34 @@
 
 A `k3s` packager and installer, primarily intended for airgapped deployments
 
+## Makefile
+
+The following commands are avaiable in the makefile.
+
+```bash
+make [build]               # Builds k3p to dist/k3p
+make pkg [PKG_ARGS="..."]  # Builds a k3s package using k3p with optional arguments
+make lint                  # Lints the codebase
+
+# If you have local nodes to play with, you can set NODE_USER and NODES in your environment
+# and use the following:
+#
+# Example
+# 
+# $ export NODES="192.168.1.100 192.168.1.101 192.168.1.102"
+# $ export NODE_USER=root
+# 
+# Then use the following targets
+
+make dist-node-1     # Install k3p and copy the package built above to the first node in NODES
+make node-shell-2    # Get a bash shell on the second node in NODES
+make clean-server-3  # Uninstall the k3s server from node 3
+make clean-agent-3   # Uninstall the k3s agent from node 3
+
+# Same as above but runs against all nodes in NODES
+make dist-node-all clean-server-all clean-agent-all
+```
+
 ## Examples
 
 ```bash
@@ -134,10 +162,6 @@ CoreDNS is running at https://127.0.0.1:6443/api/v1/namespaces/kube-system/servi
 Metrics-server is running at https://127.0.0.1:6443/api/v1/namespaces/kube-system/services/https:metrics-server:/proxy
 
 To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
-
-# The my-chart helm chart is just there for demonstration and conflicts with the whoami service
-[core@coreos1 ~]$ sudo kubectl delete svc my-chart
-service "my-chart" deleted
 
 [core@coreos1 ~]$ curl -H "Host: whoami.local" localhost
 Hostname: whoami-5dc4dd9cdf-gvcld

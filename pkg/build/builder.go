@@ -35,8 +35,8 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 	defer b.writer.Close()
 
 	if opts.K3sVersion == types.VersionLatest {
-		log.Info("Detecting latest k3s version")
-		latest, err := getLatestK3sVersion()
+		log.Info("Detecting latest k3s version for channel", opts.K3sChannel)
+		latest, err := getLatestK3sForChannel(opts.K3sChannel)
 		if err != nil {
 			return err
 		}
@@ -111,6 +111,6 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 		}
 	}
 
-	log.Infof("Archiving bundle to %q", opts.Output)
+	log.Infof("Archiving bundle to %q\n", opts.Output)
 	return b.writer.ArchiveTo(opts.Output)
 }

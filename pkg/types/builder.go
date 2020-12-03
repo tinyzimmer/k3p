@@ -8,6 +8,7 @@ type Builder interface {
 // BuildOptions is a struct containing options to pass to the build operation.
 type BuildOptions struct {
 	K3sVersion  string
+	K3sChannel  string
 	Arch        string
 	EULAFile    string
 	ImageFile   string

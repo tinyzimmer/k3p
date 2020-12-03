@@ -17,6 +17,7 @@ import (
 const (
 	k3sScriptURL       = "https://get.k3s.io"
 	k3sReleasesRootURL = "https://github.com/k3s-io/k3s/releases"
+	k3sChannelsRoot    = "https://update.k3s.io/v1-release/channels"
 )
 
 func (b *builder) downloadCoreK3sComponents(version, arch string) error {
@@ -162,13 +163,13 @@ func (b *builder) validateCheckSums(arch string) error {
 	return nil
 }
 
-func getLatestK3sVersion() (string, error) {
+func getLatestK3sForChannel(channel string) (string, error) {
 	client := &http.Client{
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
-	u := fmt.Sprintf("%s/%s", k3sReleasesRootURL, types.VersionLatest)
+	u := fmt.Sprintf("%s/%s", k3sChannelsRoot, channel)
 	resp, err := client.Get(u)
 	if err != nil {
 		return "", err

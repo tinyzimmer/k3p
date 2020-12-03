@@ -30,7 +30,7 @@ func getExternalK3sAddr() (addr string, err error) {
 			continue
 		}
 		p := fmt.Sprintf("/proc/%d/net/tcp", proc.Pid())
-		log.Debugf("Scanning %q for remote port", p)
+		log.Debugf("Scanning %q for remote port\n", p)
 		f, err := os.Open(p)
 		if err != nil {
 			return "", err

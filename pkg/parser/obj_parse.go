@@ -31,7 +31,7 @@ func (p *ManifestParser) parseFileForImages(file string) ([]string, error) {
 		// Decode the object
 		obj, err := p.Decode([]byte(raw))
 		if err != nil {
-			log.Debugf("Skipping invalid kubernetes object in %q: %s", file, err.Error())
+			log.Debugf("Skipping invalid kubernetes object in %q: %s\n", file, err.Error())
 			continue
 		}
 		// Append any images to the local images to be downloaded
