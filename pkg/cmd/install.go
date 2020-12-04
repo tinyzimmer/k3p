@@ -52,7 +52,21 @@ pre-generated one.`)
 var installCmd = &cobra.Command{
 	Use:   "install PACKAGE",
 	Short: "Install the given package to the system (requires root)",
-	Args:  cobra.ExactArgs(1),
+	Long: `
+The install command can be used to distribute a package built with "k3p build".
+
+The command takes a single argument (with optional flags) of the filesystem path or web URL
+where the package resides. Additional flags provide the ability to initialize clustering (HA),
+join existing servers, or pass custom arguments to the k3s agent/server processes.
+
+Example
+
+	$> k3p install /path/on/filesystem.tar
+	$> k3p install https://example.com/package.tar
+
+See the help below for additional information on available flags.
+`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// make sure we are root
 		usr, err := user.Current()

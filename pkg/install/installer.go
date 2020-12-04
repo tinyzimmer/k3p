@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -28,7 +29,7 @@ func (i *installer) Install(opts *types.InstallOptions) error {
 	if err := os.MkdirAll(path.Dir(types.InstalledPackageFile), 0755); err != nil {
 		return err
 	}
-	f, err := os.Open(opts.TarPath)
+	f, err := getTarReader(opts.TarPath)
 	if err != nil {
 		return err
 	}
@@ -93,6 +94,17 @@ func (i *installer) Install(opts *types.InstallOptions) error {
 	go log.TailReader("K3S", errPipe)
 
 	return cmd.Run()
+}
+
+func getTarReader(path string) (io.ReadCloser, error) {
+	if strings.HasPrefix(path, "http") {
+		resp, err := http.Get(path)
+		if err != nil {
+			return nil, err
+		}
+		return resp.Body, nil
+	}
+	return os.Open(path)
 }
 
 func promptEULA(eula *types.Artifact, autoAccept bool) error {

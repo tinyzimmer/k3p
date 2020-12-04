@@ -15,10 +15,10 @@ var infoLogger, warningLogger, errorLogger, debugLogger *logger
 
 const (
 	boldColor    = "\033[1m%s\033[0m"
-	infoColor    = "\033[1;34m%s\033[0m"
-	noticeColor  = "\033[1;36m%s\033[0m"
-	warningColor = "\033[1;33m%s\033[0m"
-	errorColor   = "\033[1;31m%s\033[0m"
+	infoColor    = "\033[0;34m%s\033[0m"
+	noticeColor  = "\033[0;36m%s\033[0m"
+	warningColor = "\033[0;33m%s\033[0m"
+	errorColor   = "\033[0;31m%s\033[0m"
 	debugColor   = "\033[0;36m%s\033[0m"
 )
 

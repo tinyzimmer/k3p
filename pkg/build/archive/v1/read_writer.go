@@ -93,10 +93,11 @@ func (rw *readWriter) Put(artifact *types.Artifact) error {
 
 func (rw *readWriter) GetManifest() (*types.PackageManifest, error) {
 	manifest := types.NewPackageManifest()
-	return manifest, filepath.Walk(rw.workDir, func(file string, fileInfo os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	return manifest, filepath.Walk(rw.workDir, func(file string, fileInfo os.FileInfo, lastErr error) error {
+		if lastErr != nil {
+			return lastErr
 		}
+
 		if fileInfo.IsDir() {
 			return nil
 		}
