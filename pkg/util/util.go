@@ -44,9 +44,9 @@ func IsK8sObject(data map[string]interface{}) bool {
 
 var letterBytes = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
-// GenerateHAToken will generate a token to be used to join additional servers to an HA cluster.
-func GenerateHAToken() string {
-	b := make([]byte, 256)
+// GenerateToken will generate a token of the given length.
+func GenerateToken(length int) string {
+	b := make([]byte, length)
 	for i := range b {
 		b[i] = letterBytes[rand.Int63()%int64(len(letterBytes))]
 	}

@@ -228,7 +228,7 @@ func configureK3sEnv(opts *types.InstallOptions) {
 		log.Info("Generating a node token for additional control-plane instances")
 		var token string
 		if opts.NodeToken == "" {
-			token = util.GenerateHAToken()
+			token = util.GenerateToken(128)
 		}
 		log.Debugf("Writing the contents of the token to %s\n", types.ServerTokenFile)
 		if err := ioutil.WriteFile(types.ServerTokenFile, []byte(strings.TrimSpace(token)), 0600); err != nil {
