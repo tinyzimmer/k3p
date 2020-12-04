@@ -142,7 +142,7 @@ func getSSHClient(opts *types.AddNodeOptions) (*ssh.Client, error) {
 		config.Auth = append(config.Auth, ssh.PublicKeys(key))
 	}
 
-	addr := net.JoinHostPort(opts.NodeAddress, strconv.Itoa(opts.SSHPort))
+	addr := net.JoinHostPort(opts.Address, strconv.Itoa(opts.SSHPort))
 	log.Debugf("Creating SSH connection with %s over TCP\n", addr)
 	return ssh.Dial("tcp", addr, config)
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	v1 "github.com/tinyzimmer/k3p/pkg/build/archive/v1"
+	"github.com/tinyzimmer/k3p/pkg/cluster/node"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 )
@@ -61,39 +62,52 @@ func (m *manager) AddNode(opts *types.AddNodeOptions) error {
 	}
 	tokenStr := string(token)
 
-	log.Infof("Connecting to server %s on port %d\n", opts.NodeAddress, opts.SSHPort)
-	client, err := getSSHClient(opts)
+	log.Infof("Connecting to server %s on port %d\n", opts.Address, opts.SSHPort)
+	newNode, err := node.Connect(opts.NodeConnectOptions)
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer newNode.Close()
 
-	if err := sshSyncManifest(client, manifest); err != nil {
+	if err := syncManifestToNode(newNode, manifest); err != nil {
 		return err
 	}
 
 	log.Infof("Joining instance as a new %s\n", opts.NodeRole)
-	session, err := client.NewSession()
-	if err != nil {
-		return err
-	}
-	defer session.Close()
-
-	outPipe, err := session.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	errPipe, err := session.StderrPipe()
-	if err != nil {
-		return err
-	}
-
-	go log.TailReader("K3S", outPipe)
-	go log.TailReader("K3S", errPipe)
-
 	cmd := buildInstallCmd(remoteAddr, tokenStr, string(opts.NodeRole))
 	log.Debug("Executing command on remote:", strings.Replace(cmd, tokenStr, "<redacted>", -1))
-	return session.Run(cmd)
+	return newNode.Execute(cmd, "K3S")
+}
+
+func syncManifestToNode(remote node.Node, manifest *types.PackageManifest) error {
+	log.Info("Installing binaries to remote machine at", types.K3sBinDir)
+	for _, bin := range manifest.Bins {
+		if err := remote.WriteFile(bin.Body, path.Join(types.K3sBinDir, bin.Name), "0755", bin.Size); err != nil {
+			return err
+		}
+	}
+
+	log.Info("Installing scripts to remote machine at", types.K3sScriptsDir)
+	for _, script := range manifest.Scripts {
+		if err := remote.WriteFile(script.Body, path.Join(types.K3sScriptsDir, script.Name), "0755", script.Size); err != nil {
+			return err
+		}
+	}
+
+	log.Info("Installing images to remote machine at", types.K3sImagesDir)
+	for _, imgs := range manifest.Images {
+		if err := remote.WriteFile(imgs.Body, path.Join(types.K3sImagesDir, imgs.Name), "0644", imgs.Size); err != nil {
+			return err
+		}
+	}
+
+	log.Info("Installing manifests to remote machine at", types.K3sManifestsDir)
+	for _, mani := range manifest.Manifests {
+		if err := remote.WriteFile(mani.Body, path.Join(types.K3sManifestsDir, mani.Name), "0644", mani.Size); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func buildInstallCmd(remoteAddr, token, nodeRole string) string {

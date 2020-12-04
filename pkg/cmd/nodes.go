@@ -21,7 +21,7 @@ var (
 )
 
 func init() {
-	nodeAddOpts = &types.AddNodeOptions{}
+	nodeAddOpts = &types.AddNodeOptions{NodeConnectOptions: &types.NodeConnectOptions{}}
 
 	u, err := user.Current()
 	if err != nil {
@@ -53,7 +53,7 @@ var nodesAddCmd = &cobra.Command{
 	Short: "Add a new node to the cluster",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		nodeAddOpts.NodeAddress = args[0]
+		nodeAddOpts.Address = args[0]
 
 		switch types.K3sRole(nodeAddRole) {
 		case types.K3sRoleServer:
