@@ -98,7 +98,7 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 	}
 
 	if opts.EULAFile != "" {
-		log.Infof("Adding EULA from %q", opts.EULAFile)
+		log.Infof("Adding EULA from %q\n", opts.EULAFile)
 		f, err := os.Open(opts.EULAFile)
 		if err != nil {
 			return err

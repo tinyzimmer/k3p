@@ -1,6 +1,9 @@
 package install
 
 import (
+	"bufio"
+	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -51,19 +54,9 @@ func (i *installer) Install(opts *types.InstallOptions) error {
 	// check package for a EULA
 	eula := &types.Artifact{Name: "EULA.txt"}
 	if err := pkg.Get(eula); err == nil {
-		// File was found
-		if !opts.AcceptEULA {
-			pager := os.Getenv("PAGER")
-			if pager == "" {
-				pager = "less"
-			}
-			cmd := exec.Command(pager)
-			cmd.Stdin = eula.Body
-			cmd.Stdout = os.Stdout
-			if err := cmd.Run(); err != nil {
-				return err
-			}
-			time.Sleep(time.Second)
+		// EULA found
+		if err := promptEULA(eula, opts.AcceptEULA); err != nil {
+			return err
 		}
 	} else if !os.IsNotExist(err) {
 		// Error other than file not found
@@ -100,6 +93,37 @@ func (i *installer) Install(opts *types.InstallOptions) error {
 	go log.TailReader("K3S", errPipe)
 
 	return cmd.Run()
+}
+
+func promptEULA(eula *types.Artifact, autoAccept bool) error {
+	if autoAccept {
+		return nil
+	}
+	pager := os.Getenv("PAGER")
+	if pager == "" {
+		pager = "less"
+	}
+	cmd := exec.Command(pager)
+	cmd.Stdin = eula.Body
+	cmd.Stdout = os.Stdout
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	scanner := bufio.NewScanner(os.Stdin)
+	for {
+		fmt.Print("Do you accept the terms of the EULA? [y/N] ")
+		scanner.Scan()
+		text := scanner.Text()
+		switch strings.ToLower(text) {
+		case "y":
+			time.Sleep(time.Second)
+			return nil
+		case "n":
+			return errors.New("EULA was declined")
+		default:
+			fmt.Printf("%q is not a valid response, choose 'y' or 'n' \n", text)
+		}
+	}
 }
 
 func (i *installer) installManifest(manifest *types.PackageManifest) error {

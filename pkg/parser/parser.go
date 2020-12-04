@@ -11,32 +11,19 @@ import (
 	"github.com/tinyzimmer/k3p/pkg/types"
 	"github.com/tinyzimmer/k3p/pkg/util"
 	"gopkg.in/yaml.v2"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	corescheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 // NewManifestParser returns an interface for parsing container images from the given directory.
 func NewManifestParser(parseDir string, excludeDirs []string, helmArgs string) types.ManifestParser {
-	// create a new scheme
-	sch := runtime.NewScheme()
-
-	// currently only supports core APIs, could consider some way of dynamically adding CRD support
-	// full list: https://github.com/kubernetes/client-go/blob/master/kubernetes/scheme/register.go
-	_ = corescheme.AddToScheme(sch)
-
-	base := &BaseManifestParser{
-		ParseDir:     parseDir,
-		ExcludeDirs:  excludeDirs,
-		HelmArgs:     helmArgs,
-		Deserializer: serializer.NewCodecFactory(sch).UniversalDeserializer(),
+	return &ManifestParser{
+		BaseManifestParser: NewBaseManifestParser(parseDir, excludeDirs, helmArgs),
 	}
-	return &ManifestParser{BaseManifestParser: base}
 }
 
 // ManifestParser implements a types.ManifestParser that extracts image names from
 // raw kubernetes manifests.
+// Helm functionality was included in this implementation as well for simplicity sake, but I'd
+// ultimately like this divided into separate structs.
 type ManifestParser struct{ *BaseManifestParser }
 
 // ParseImages implements the types.ManifestParser interface. It walks the configured directory,

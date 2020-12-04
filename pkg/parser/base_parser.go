@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	corescheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 // BaseManifestParser represents the base elements for a parser interface. It contains
@@ -17,6 +19,23 @@ type BaseManifestParser struct {
 	ExcludeDirs  []string
 	HelmArgs     string
 	Deserializer runtime.Decoder
+}
+
+// NewBaseManifestParser returns a new base parser with the given arguments.
+func NewBaseManifestParser(parseDir string, excludeDirs []string, helmArgs string) *BaseManifestParser {
+	// create a new scheme
+	sch := runtime.NewScheme()
+
+	// currently only supports core APIs, could consider some way of dynamically adding CRD support
+	// full list: https://github.com/kubernetes/client-go/blob/master/kubernetes/scheme/register.go
+	_ = corescheme.AddToScheme(sch)
+
+	return &BaseManifestParser{
+		ParseDir:     parseDir,
+		ExcludeDirs:  excludeDirs,
+		HelmArgs:     helmArgs,
+		Deserializer: serializer.NewCodecFactory(sch).UniversalDeserializer(),
+	}
 }
 
 // GetParseDir returns the directory to be parsed for container images.
