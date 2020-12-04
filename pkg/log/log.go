@@ -13,20 +13,27 @@ var Verbose bool
 
 var infoLogger, warningLogger, errorLogger, debugLogger *logger
 
+const (
+	infoColor    = "\033[1;34m%s\033[0m"
+	noticeColor  = "\033[1;36m%s\033[0m"
+	warningColor = "\033[1;33m%s\033[0m"
+	errorColor   = "\033[1;31m%s\033[0m"
+	debugColor   = "\033[0;36m%s\033[0m"
+)
+
 func init() {
-	infoLogger = &logger{"INFO"}
-	warningLogger = &logger{"WARNING"}
-	errorLogger = &logger{"ERROR"}
-	debugLogger = &logger{"DEBUG"}
+	infoLogger = &logger{"INFO", infoColor}
+	warningLogger = &logger{"WARNING", warningColor}
+	errorLogger = &logger{"ERROR", errorColor}
+	debugLogger = &logger{"DEBUG", debugColor}
 }
 
-type logger struct{ level string }
+type logger struct {
+	prefix, color string
+}
 
-func (l *logger) getLevel() string {
-	if l.level != "" {
-		return fmt.Sprintf("[%s]", l.level)
-	}
-	return ""
+func (l *logger) getPrefix() string {
+	return fmt.Sprintf(l.color, fmt.Sprintf("[%s]", l.prefix))
 }
 
 const timeFormat = "2006/01/02 15:04:05"
@@ -36,7 +43,7 @@ func (l *logger) getTime() string {
 }
 
 func (l *logger) seedLine() {
-	fmt.Print(l.getTime(), "  ", l.getLevel(), "\t")
+	fmt.Print(l.getTime(), "  ", l.getPrefix(), "\t")
 }
 
 func (l *logger) Println(args ...interface{}) {
@@ -51,8 +58,9 @@ func (l *logger) Printf(fstr string, args ...interface{}) {
 
 // TailReader will follow the given reader and send its contents
 // to a dedicated logger configured with the given prefix.
+// TODO: Make color configurable
 func TailReader(prefix string, rdr io.Reader) {
-	l := &logger{prefix}
+	l := &logger{prefix, infoColor}
 	scanner := bufio.NewScanner(rdr)
 	for scanner.Scan() {
 		text := scanner.Text()
