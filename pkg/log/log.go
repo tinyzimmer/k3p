@@ -11,6 +11,15 @@ import (
 // Verbose is set by the CLI flag to enable debug logging
 var Verbose bool
 
+var infoLogger, warningLogger, errorLogger, debugLogger *logger
+
+func init() {
+	infoLogger = &logger{"INFO"}
+	warningLogger = &logger{"WARNING"}
+	errorLogger = &logger{"ERROR"}
+	debugLogger = &logger{"DEBUG"}
+}
+
 type logger struct{ level string }
 
 func (l *logger) getLevel() string {
@@ -20,8 +29,10 @@ func (l *logger) getLevel() string {
 	return ""
 }
 
+const timeFormat = "2006/01/02 15:04:05"
+
 func (l *logger) getTime() string {
-	return time.Now().Local().Format("2006/01/02 15:04:05")
+	return time.Now().Local().Format(timeFormat)
 }
 
 func (l *logger) seedLine() {
@@ -38,17 +49,8 @@ func (l *logger) Printf(fstr string, args ...interface{}) {
 	fmt.Printf(fstr, args...)
 }
 
-var infoLogger, warningLogger, errorLogger, debugLogger *logger
-
-func init() {
-	infoLogger = &logger{"INFO"}
-	warningLogger = &logger{"WARNING"}
-	errorLogger = &logger{"ERROR"}
-	debugLogger = &logger{"DEBUG"}
-}
-
 // TailReader will follow the given reader and send its contents
-// to the INFO logger.
+// to a dedicated logger configured with the given prefix.
 func TailReader(prefix string, rdr io.Reader) {
 	l := &logger{prefix}
 	scanner := bufio.NewScanner(rdr)
