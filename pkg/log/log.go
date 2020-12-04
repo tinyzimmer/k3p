@@ -14,6 +14,7 @@ var Verbose bool
 var infoLogger, warningLogger, errorLogger, debugLogger *logger
 
 const (
+	boldColor    = "\033[1m%s\033[0m"
 	infoColor    = "\033[1;34m%s\033[0m"
 	noticeColor  = "\033[1;36m%s\033[0m"
 	warningColor = "\033[1;33m%s\033[0m"
@@ -39,7 +40,7 @@ func (l *logger) getPrefix() string {
 const timeFormat = "2006/01/02 15:04:05"
 
 func (l *logger) getTime() string {
-	return time.Now().Local().Format(timeFormat)
+	return fmt.Sprintf(noticeColor, time.Now().Local().Format(timeFormat))
 }
 
 func (l *logger) seedLine() {
@@ -48,12 +49,14 @@ func (l *logger) seedLine() {
 
 func (l *logger) Println(args ...interface{}) {
 	l.seedLine()
-	fmt.Println(args...)
+	line := fmt.Sprintln(args...)
+	fmt.Printf(boldColor, line)
 }
 
 func (l *logger) Printf(fstr string, args ...interface{}) {
 	l.seedLine()
-	fmt.Printf(fstr, args...)
+	line := fmt.Sprintf(fstr, args...)
+	fmt.Printf(boldColor, line)
 }
 
 // TailReader will follow the given reader and send its contents
