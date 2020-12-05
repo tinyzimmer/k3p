@@ -22,6 +22,9 @@ PKG_ARGS ?=
 $(PACKAGE): $(BIN)
 	$(BIN) build -o $(PACKAGE) $(PKG_ARGS)
 
+docs:
+	go run hack/docgen.go
+
 # Cleans binaries and packages from the repo
 clean:
 	find . -name *.coverprofile -exec rm {} \;
