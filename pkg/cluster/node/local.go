@@ -34,7 +34,7 @@ func (l *localNode) WriteFile(rdr io.ReadCloser, dest string, mode string, size 
 	if err := l.MkdirAll(path.Dir(dest)); err != nil {
 		return err
 	}
-	u, err := strconv.ParseUint("0755", 0, 16)
+	u, err := strconv.ParseUint(mode, 0, 16)
 	if err != nil {
 		return err
 	}

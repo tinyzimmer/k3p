@@ -11,6 +11,7 @@ import (
 	"github.com/tinyzimmer/k3p/pkg/cluster/node"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
+	"github.com/tinyzimmer/k3p/pkg/util"
 )
 
 // New returns a new ClusterManager instance.
@@ -94,7 +95,7 @@ func (m *manager) AddNode(opts *types.AddNodeOptions) error {
 	}
 	defer newNode.Close()
 
-	if err := node.SyncManifestToNode(newNode, manifest); err != nil {
+	if err := util.SyncManifestToNode(newNode, manifest); err != nil {
 		return err
 	}
 

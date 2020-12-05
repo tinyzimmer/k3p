@@ -149,14 +149,8 @@ func (rw *readWriter) Get(artifact *types.Artifact) error {
 
 func (rw *readWriter) Close() error { return os.RemoveAll(rw.workDir) }
 
-func (rw *readWriter) ArchiveTo(path string) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	tw := tar.NewWriter(f)
+func (rw *readWriter) archiveToWriter(w io.Writer) error {
+	tw := tar.NewWriter(w)
 	defer tw.Close()
 
 	return filepath.Walk(rw.workDir, func(file string, fileInfo os.FileInfo, lastErr error) error {
@@ -196,6 +190,15 @@ func (rw *readWriter) ArchiveTo(path string) error {
 		_, err = io.Copy(tw, data)
 		return err
 	})
+}
+
+func (rw *readWriter) ArchiveTo(path string) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return rw.archiveToWriter(f)
 }
 
 func (rw *readWriter) stripWorkdirPrefix(path string) string {

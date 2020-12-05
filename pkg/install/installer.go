@@ -15,21 +15,22 @@ import (
 	"time"
 
 	v1 "github.com/tinyzimmer/k3p/pkg/build/archive/v1"
-	"github.com/tinyzimmer/k3p/pkg/cluster/node"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 	"github.com/tinyzimmer/k3p/pkg/util"
 )
 
 // New returns a new package installer.
-func New() types.Installer { return &installer{} }
+func New() types.Installer { return &installer{getTarReader: getTarReader} }
 
-type installer struct{}
+type installer struct {
+	getTarReader func(path string) (io.ReadCloser, int64, error)
+}
 
 func (i *installer) Install(target types.Node, opts *types.InstallOptions) error {
 	log.Info("Copying the archive to the rancher installation directory")
 
-	f, size, err := getTarReader(opts.TarPath)
+	f, size, err := i.getTarReader(opts.TarPath)
 	if err != nil {
 		return err
 	}
@@ -70,12 +71,15 @@ func (i *installer) Install(target types.Node, opts *types.InstallOptions) error
 	}
 
 	// unpack the manifest into the appropriate locations
-	if err := node.SyncManifestToNode(target, manifest); err != nil {
+	if err := util.SyncManifestToNode(target, manifest); err != nil {
 		return err
 	}
 
 	log.Info("Running k3s installation script")
-	cmd := generateK3sInstallCommand(target, opts)
+	cmd, err := generateK3sInstallCommand(target, opts)
+	if err != nil {
+		return err
+	}
 
 	return target.Execute(cmd, "K3S")
 }
@@ -132,7 +136,7 @@ func promptEULA(eula *types.Artifact, autoAccept bool) error {
 	}
 }
 
-func generateK3sInstallCommand(target types.Node, opts *types.InstallOptions) string {
+func generateK3sInstallCommand(target types.Node, opts *types.InstallOptions) (string, error) {
 	var token string
 
 	cmd := `INSTALL_K3S_SKIP_DOWNLOAD="true" `
@@ -155,13 +159,11 @@ func generateK3sInstallCommand(target types.Node, opts *types.InstallOptions) st
 			log.Info("Generating a node token for additional control-plane instances")
 			token = util.GenerateToken(128)
 		}
-		log.Debugf("Writing the contents of the token to %s\n", types.ServerTokenFile)
+		// There needs to be a better place for this
+		log.Debugf("Writing the contents of the server token to %s\n", types.ServerTokenFile)
 		if err := target.WriteFile(ioutil.NopCloser(strings.NewReader(token)), types.ServerTokenFile, "0600", 128); err != nil {
-			// TODO: error handling, this is technically important
-			log.Error("Failed to write the server join token to the filesystem. Be sure to copy it down for future reference.")
-			log.Error(err)
+			return "", err
 		}
-		log.Info("You can join new servers to the control-plane with the following token:", token) // with above fixed, don't log, just make available in the future
 		cmd = cmd + fmt.Sprintf("K3S_TOKEN=%q ", token)
 		// append --cluster-init to enable clustering (https://rancher.com/docs/k3s/latest/en/installation/ha-embedded/)
 		opts.K3sExecArgs = opts.K3sExecArgs + " --cluster-init"
@@ -179,5 +181,5 @@ func generateK3sInstallCommand(target types.Node, opts *types.InstallOptions) st
 		loggedCmd = strings.Replace(loggedCmd, token, "<redacted>", -1)
 	}
 	log.Debug("Generated K3s installation command:", loggedCmd)
-	return cmd
+	return cmd, nil
 }

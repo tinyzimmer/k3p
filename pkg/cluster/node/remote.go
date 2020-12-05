@@ -1,7 +1,6 @@
 package node
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -59,7 +58,7 @@ func (n *remoteNode) GetFile(path string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	remoteRdr := &remoteReadCloser{sess: sess, pipe: bufio.NewReader(outPipe)}
+	remoteRdr := &remoteReadCloser{sess: sess, pipe: outPipe}
 	if err := sess.Start(fmt.Sprintf("sudo cat %q", path)); err != nil {
 		if cerr := sess.Close(); cerr != nil {
 			log.Error("Unexpected error while closing failed ssh get file:", cerr)
