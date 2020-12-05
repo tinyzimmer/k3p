@@ -24,7 +24,7 @@ var NoCache bool
 var DefaultCache HTTPCache
 
 func init() {
-	cache := &httpCache{}
+	cache := &httpCache{get: http.Get}
 	defer func() { DefaultCache = cache }()
 	usr, err := user.Current()
 	if err != nil {
@@ -39,7 +39,7 @@ func init() {
 	cache.cacheDir = cacheDir
 }
 
-// HTTPCache is an object for retrieving files from the internet while
+// HTTPCache is an interface for retrieving files from the internet while
 // maintaining a local cache of received objects for use across CLI
 // invocations. It is a very basic implementation that can be refactored
 // in the future.
@@ -55,11 +55,15 @@ type HTTPCache interface {
 
 // New creates a new HTTPCache using the given directory
 func New(dir string) HTTPCache {
-	return &httpCache{cacheDir: dir}
+	return &httpCache{
+		cacheDir: dir,
+		get:      http.Get,
+	}
 }
 
 type httpCache struct {
 	cacheDir string
+	get      func(url string) (*http.Response, error)
 }
 
 func (h *httpCache) CacheDir() string { return h.cacheDir }
@@ -88,7 +92,7 @@ func (h *httpCache) Get(url string) (io.ReadCloser, error) {
 	}
 
 	// We need to download the file
-	resp, err := http.Get(url)
+	resp, err := h.get(url)
 	if err != nil {
 		return nil, err
 	}

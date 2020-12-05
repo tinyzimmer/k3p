@@ -17,6 +17,8 @@ func New() types.ClusterManager { return &manager{} }
 
 type manager struct{}
 
+func (m *manager) RemoveNode(opts *types.RemoveNodeOptions) error { return nil }
+
 func (m *manager) AddNode(opts *types.AddNodeOptions) error {
 	// this function assumes port 6443, which is the default
 	//
@@ -69,7 +71,7 @@ func (m *manager) AddNode(opts *types.AddNodeOptions) error {
 	}
 	defer newNode.Close()
 
-	if err := syncManifestToNode(newNode, manifest); err != nil {
+	if err := node.SyncManifestToNode(newNode, manifest); err != nil {
 		return err
 	}
 
@@ -77,37 +79,6 @@ func (m *manager) AddNode(opts *types.AddNodeOptions) error {
 	cmd := buildInstallCmd(remoteAddr, tokenStr, string(opts.NodeRole))
 	log.Debug("Executing command on remote:", strings.Replace(cmd, tokenStr, "<redacted>", -1))
 	return newNode.Execute(cmd, "K3S")
-}
-
-func syncManifestToNode(remote node.Node, manifest *types.PackageManifest) error {
-	log.Info("Installing binaries to remote machine at", types.K3sBinDir)
-	for _, bin := range manifest.Bins {
-		if err := remote.WriteFile(bin.Body, path.Join(types.K3sBinDir, bin.Name), "0755", bin.Size); err != nil {
-			return err
-		}
-	}
-
-	log.Info("Installing scripts to remote machine at", types.K3sScriptsDir)
-	for _, script := range manifest.Scripts {
-		if err := remote.WriteFile(script.Body, path.Join(types.K3sScriptsDir, script.Name), "0755", script.Size); err != nil {
-			return err
-		}
-	}
-
-	log.Info("Installing images to remote machine at", types.K3sImagesDir)
-	for _, imgs := range manifest.Images {
-		if err := remote.WriteFile(imgs.Body, path.Join(types.K3sImagesDir, imgs.Name), "0644", imgs.Size); err != nil {
-			return err
-		}
-	}
-
-	log.Info("Installing manifests to remote machine at", types.K3sManifestsDir)
-	for _, mani := range manifest.Manifests {
-		if err := remote.WriteFile(mani.Body, path.Join(types.K3sManifestsDir, mani.Name), "0644", mani.Size); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func buildInstallCmd(remoteAddr, token, nodeRole string) string {

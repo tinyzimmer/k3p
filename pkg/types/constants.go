@@ -27,6 +27,12 @@ const K3sScriptsDir = "/usr/local/bin/k3p-scripts"
 // K3sBinDir is the directory where binaries are installed to the system.
 const K3sBinDir = "/usr/local/bin"
 
+// K3sKubeconfig is the path where the admin kubeconfig is stored on the system.
+const K3sKubeconfig = "/etc/rancher/k3s/k3s.yaml"
+
+// K3sInternalIPLabel is the label K3s uses for the internal IP of a node
+const K3sInternalIPLabel = "k3s.io/internal-ip"
+
 // K3sRole represents the different roles a machine can take in the cluster
 type K3sRole string
 

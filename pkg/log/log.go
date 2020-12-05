@@ -4,12 +4,16 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 )
 
 // Verbose is set by the CLI flag to enable debug logging
 var Verbose bool
+
+// LogWriter can be overwritten by tests to suppress log output
+var LogWriter io.Writer = os.Stdout
 
 var infoLogger, warningLogger, errorLogger, debugLogger *logger
 
@@ -44,19 +48,19 @@ func (l *logger) getTime() string {
 }
 
 func (l *logger) seedLine() {
-	fmt.Print(l.getTime(), "  ", l.getPrefix(), "\t")
+	fmt.Fprint(LogWriter, l.getTime(), "  ", l.getPrefix(), "\t")
 }
 
 func (l *logger) Println(args ...interface{}) {
 	l.seedLine()
 	line := fmt.Sprintln(args...)
-	fmt.Printf(boldColor, line)
+	fmt.Fprintf(LogWriter, boldColor, line)
 }
 
 func (l *logger) Printf(fstr string, args ...interface{}) {
 	l.seedLine()
 	line := fmt.Sprintf(fstr, args...)
-	fmt.Printf(boldColor, line)
+	fmt.Fprintf(LogWriter, boldColor, line)
 }
 
 // TailReader will follow the given reader and send its contents
