@@ -12,24 +12,7 @@ The following commands are avaiable in the makefile.
 make [build]               # Builds k3p to dist/k3p
 make pkg [PKG_ARGS="..."]  # Builds a k3s package using k3p with optional arguments
 make lint                  # Lints the codebase
-
-# If you have local nodes to play with, you can set NODE_USER and NODES in your environment
-# and use the following:
-#
-# Example
-# 
-# $ export NODES="192.168.1.100 192.168.1.101 192.168.1.102"
-# $ export NODE_USER=root
-# 
-# Then use the following targets
-
-make dist-node-1     # Install k3p and copy the package built above to the first node in NODES
-make node-shell-2    # Get a bash shell on the second node in NODES
-make clean-server-3  # Uninstall the k3s server from node 3
-make clean-agent-3   # Uninstall the k3s agent from node 3
-
-# Same as above but runs against all nodes in NODES
-make dist-node-all clean-server-all clean-agent-all
+make test                  # Run unit tests
 ```
 
 ## Examples

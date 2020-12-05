@@ -3,6 +3,9 @@ package types
 // VersionLatest is a string signaling that the latest version should be retrieved for k3s.
 const VersionLatest string = "latest"
 
+// ManifestMetaFile is the name used when writing the version information to an archive.
+const ManifestMetaFile = "manifest.json"
+
 // ManifestEULAFile is the name used when archiving an EULA.
 const ManifestEULAFile = "EULA.txt"
 

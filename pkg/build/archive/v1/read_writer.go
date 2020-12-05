@@ -2,7 +2,9 @@ package v1
 
 import (
 	"archive/tar"
+	"encoding/json"
 	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -85,6 +87,15 @@ func (rw *readWriter) Put(artifact *types.Artifact) error {
 	return err
 }
 
+func (rw *readWriter) PutMeta(meta *types.PackageMeta) error {
+	body, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		return err
+	}
+	outPath := path.Join(rw.workDir, types.ManifestMetaFile)
+	return ioutil.WriteFile(outPath, body, 0644)
+}
+
 func (rw *readWriter) GetManifest() (*types.PackageManifest, error) {
 	manifest := types.NewPackageManifest()
 	return manifest, filepath.Walk(rw.workDir, func(file string, fileInfo os.FileInfo, lastErr error) error {
@@ -145,6 +156,20 @@ func (rw *readWriter) Get(artifact *types.Artifact) error {
 	artifact.Body = f
 	artifact.Size = stat.Size()
 	return nil
+}
+
+func (rw *readWriter) GetMeta() (*types.PackageMeta, error) {
+	artifact := &types.Artifact{Name: types.ManifestMetaFile}
+	if err := rw.Get(artifact); err != nil {
+		return nil, err
+	}
+	defer artifact.Body.Close()
+	metaRaw, err := ioutil.ReadAll(artifact.Body)
+	if err != nil {
+		return nil, err
+	}
+	var meta types.PackageMeta
+	return &meta, json.Unmarshal(metaRaw, &meta)
 }
 
 func (rw *readWriter) Close() error { return os.RemoveAll(rw.workDir) }

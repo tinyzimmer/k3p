@@ -11,13 +11,17 @@ import (
 // BundleReadWriter is an interface to be implemented for use by a package bundler/extracter.
 // Different versions of how manifests are built can implement this interface.
 type BundleReadWriter interface {
-	// Put should store the provided artifact inside the bundle.
+	// Put should store the provided artifact inside the archive.
 	Put(*Artifact) error
-	// Read should populate the given artifact with the contents inside the bundle.
+	// PutMeta should store the package metadata inside the archive.
+	PutMeta(meta *PackageMeta) error
+	// Read should populate the given artifact with the contents inside the archive.
 	Get(*Artifact) error
-	// GetManifest should retrieve readable copies of the entire contents of the bundle.
+	// GetMeta should return the metadata associated with the archive
+	GetMeta() (*PackageMeta, error)
+	// GetManifest should retrieve readable copies of the entire contents of the archive.
 	GetManifest() (*PackageManifest, error)
-	// ArchiveTo should tar the contents of the bundle (with any required meta) to the given
+	// ArchiveTo should tar the contents of the archive (with any required meta) to the given
 	// path.
 	ArchiveTo(path string) error
 	// Close should cleanup the interface's working directory.

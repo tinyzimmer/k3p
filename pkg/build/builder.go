@@ -11,6 +11,8 @@ import (
 	"github.com/tinyzimmer/k3p/pkg/parser"
 	"github.com/tinyzimmer/k3p/pkg/types"
 	"github.com/tinyzimmer/k3p/pkg/util"
+
+	"github.com/docker/docker/pkg/namesgenerator"
 )
 
 // NewBuilder returns a new Builder for the given K3s version and architecture. If tmpDir
@@ -33,6 +35,10 @@ type builder struct {
 
 func (b *builder) Build(opts *types.BuildOptions) error {
 	defer b.writer.Close()
+
+	if opts.Name == "" {
+		opts.Name = namesgenerator.GetRandomName(0)
+	}
 
 	if opts.K3sVersion == types.VersionLatest {
 		log.Info("Detecting latest k3s version for channel", opts.K3sChannel)
@@ -111,6 +117,19 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 		}
 	}
 
-	log.Infof("Archiving bundle to %q\n", opts.Output)
+	log.Info("Writing package metadata")
+	packageMeta := types.PackageMeta{
+		MetaVersion: "v1",
+		Name:        opts.Name,
+		Version:     opts.BuildVersion,
+		K3sVersion:  opts.K3sVersion,
+		Arch:        opts.Arch,
+	}
+	log.Debugf("Package meta: %+v\n", packageMeta)
+	if err := b.writer.PutMeta(&packageMeta); err != nil {
+		return err
+	}
+
+	log.Infof("Archiving version %q of bundle to %q\n", opts.BuildVersion, opts.Output)
 	return b.writer.ArchiveTo(opts.Output)
 }

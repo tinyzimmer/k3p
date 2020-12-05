@@ -15,7 +15,6 @@ import (
 )
 
 func main() {
-
 	if err := genMarkdownDocs(); err != nil {
 		log.Fatal(err)
 	}

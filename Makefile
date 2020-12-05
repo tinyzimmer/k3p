@@ -60,8 +60,11 @@ NODES ?= 172.17.113.136 172.17.113.137 172.17.113.130
 # Gets node by index: Usage $(call get-node,1)
 get-node = $(word $1,$(NODES))
 
+# Gets the server token from the leader
+get-server-token = $(shell ssh $(NODE_USER)@$(call get-node,1) sudo cat /var/lib/rancher/k3s/server/server-token)
+
 # Distribute the k3p binary and package.tar to the nodes
-dist-node-all: dist-node-1 dist-node-2 dist-node-3
+dist-all-nodes: dist-node-1 dist-node-2 dist-node-3
 dist-node-%: $(BIN) $(PACKAGE)
 	scp -r dist/ $(NODE_USER)@$(call get-node,$*):~/
 	$(MAKE) node-shell-$* CMD="sudo rm -rf /usr/local/bin/k3p && sudo mv /var/home/core/dist/k3p /usr/local/bin/k3p && sudo chmod +x /usr/local/bin/k3p"
@@ -77,11 +80,34 @@ kubeconfig:
 deploy: $(BIN) $(PACKAGE) dist-node-1
 	$(MAKE) node-shell-1 CMD="sudo k3p install dist/package.tar"
 
-ha-cluster: $(BIN) $(PACKAGE) dist-node-1
+ha-local: $(BIN) $(PACKAGE)
+	$(BIN) install $(PACKAGE) --verbose --host=$(call get-node,1) --ssh-user=core --init-ha
+	sleep 10
+	$(BIN) node add $(call get-node,2) --verbose --leader=$(call get-node,1) --ssh-user=core --node-role=server
+	$(BIN) node add $(call get-node,3) --verbose --leader=$(call get-node,1) --ssh-user=core --node-role=server
+
+ha-remote: $(BIN) $(PACKAGE) dist-node-1
 	$(MAKE) node-shell-1 CMD="sudo k3p install dist/package.tar --init-ha -v"
-	sleep 7
+	sleep 10
 	$(MAKE) node-shell-1 CMD="sudo k3p node add $(call get-node,2) --node-role=server --ssh-user=core --private-key=/var/home/core/.ssh/id_rsa -v"
 	$(MAKE) node-shell-1 CMD="sudo k3p node add $(call get-node,3) --node-role=server --ssh-user=core --private-key=/var/home/core/.ssh/id_rsa -v"
+
+ha-join-%:
+	$(MAKE) node-shell-$* CMD='sudo k3p install dist/package.tar --verbose --join=https://$(call get-node,1):6443 --join-role=server --join-token="$(call get-server-token)"'
+
+ha-cluster: $(BIN) $(PACKAGAE) dist-all-nodes
+	$(MAKE) node-shell-1 CMD="sudo k3p install dist/package.tar --init-ha -v"
+	sleep 10
+	$(MAKE) ha-join-2
+	$(MAKE) ha-join-3
+
+# Runs all the different dev flows to make sure nothing serious broke
+# Once I add docker functionality (e.g. deploy a package to local containers), this can be used
+# for integration testing.
+testacc: 
+	$(MAKE) ha-local clean-all-servers 
+	$(MAKE) ha-remote clean-all-servers 
+	$(MAKE) ha-cluster clean-all-servers
 
 # Uninstall the k3s server from the node
 clean-all-servers: clean-server-1 clean-server-2 clean-server-3
