@@ -53,17 +53,17 @@ k3p install PACKAGE [flags]
       --kubeconfig-mode string   The mode to set on the k3s kubeconfig. Default is to only allow root access
   -n, --node-name string         An optional name to give this node in the cluster
   -k, --private-key string       The path to a private key to use when authenticating against the remote host, 
-                                 if not provided you will be prompted for a password (default "/home/aizimmerman/.ssh/id_rsa")
+                                 if not provided you will be prompted for a password (default "/home/<user>/.ssh/id_rsa")
       --resolv-conf string       The path of a resolv-conf file to use when configuring DNS in the cluster.
                                  When used with the --host flag, the path must reside on the remote system (this will change in the future).
   -p, --ssh-port int             The port to use when connecting to the remote host over SSH (default 22)
-  -u, --ssh-user string          The username to use when authenticating against the remote host (default "aizimmerman")
+  -u, --ssh-user string          The username to use when authenticating against the remote host (default "<user>")
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --cache-dir string   Override the default location for cached k3s assets (default "/home/aizimmerman/.k3p/cache")
+      --cache-dir string   Override the default location for cached k3s assets (default "/home/<user>/.k3p/cache")
       --tmp-dir string     Override the default tmp directory (default "/tmp")
   -v, --verbose            Enable verbose logging
 ```

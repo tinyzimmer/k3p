@@ -16,16 +16,16 @@ k3p build [flags]
   -H, --helm-args string   Arguments to pass to the 'helm template' command when searching for images
   -h, --help               help for build
   -i, --images string      A file containing a list of extra images to bundle with the archive
-  -m, --manifests string   The directory to scan for kubernetes manifests and charts, defaults to the current directory (default "/home/aizimmerman/devel/k3p")
+  -m, --manifests string   The directory to scan for kubernetes manifests and charts, defaults to the current directory (default "/home/<user>/devel/k3p")
   -N, --no-cache           Disable the use of the local cache when downloading assets.
-  -o, --output string      The file to save the distribution package to (default "/home/aizimmerman/devel/k3p/package.tar")
+  -o, --output string      The file to save the distribution package to (default "/home/<user>/devel/k3p/package.tar")
   -V, --version string     A specific k3s version to bundle with the package, overrides --channel (default "latest")
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --cache-dir string   Override the default location for cached k3s assets (default "/home/aizimmerman/.k3p/cache")
+      --cache-dir string   Override the default location for cached k3s assets (default "/home/<user>/.k3p/cache")
       --tmp-dir string     Override the default tmp directory (default "/tmp")
   -v, --verbose            Enable verbose logging
 ```

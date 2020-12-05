@@ -17,15 +17,15 @@ k3p node add NODE [flags]
                              the installation manifest.
                              
   -r, --node-role string     Whether to join the instance as a 'server' or 'agent' (default "agent")
-  -k, --private-key string   A private key to use for SSH authentication, if not provided you will be prompted for a password (default "/home/aizimmerman/.ssh/id_rsa")
+  -k, --private-key string   A private key to use for SSH authentication, if not provided you will be prompted for a password (default "/home/<user>/.ssh/id_rsa")
   -p, --ssh-port int         The port to use when connecting to the remote instance over SSH (default 22)
-  -u, --ssh-user string      The remote user to use for SSH authentication (default "aizimmerman")
+  -u, --ssh-user string      The remote user to use for SSH authentication (default "<user>")
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --cache-dir string   Override the default location for cached k3s assets (default "/home/aizimmerman/.k3p/cache")
+      --cache-dir string   Override the default location for cached k3s assets (default "/home/<user>/.k3p/cache")
       --tmp-dir string     Override the default tmp directory (default "/tmp")
   -v, --verbose            Enable verbose logging
 ```

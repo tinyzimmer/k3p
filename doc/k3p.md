@@ -11,7 +11,7 @@ The k3p command provides an easy method for packaging a kubernetes environment i
 ### Options
 
 ```
-      --cache-dir string   Override the default location for cached k3s assets (default "/home/aizimmerman/.k3p/cache")
+      --cache-dir string   Override the default location for cached k3s assets (default "/home/<user>/.k3p/cache")
   -h, --help               help for k3p
       --tmp-dir string     Override the default tmp directory (default "/tmp")
   -v, --verbose            Enable verbose logging
