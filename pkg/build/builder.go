@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	v1 "github.com/tinyzimmer/k3p/pkg/build/archive/v1"
+	v1 "github.com/tinyzimmer/k3p/pkg/build/package/v1"
 	"github.com/tinyzimmer/k3p/pkg/images"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/parser"
@@ -30,7 +30,7 @@ func NewBuilder() (types.Builder, error) {
 // builder implements the Builder interface.
 type builder struct {
 	// the directory for storing temporary assets during the build
-	writer types.BundleReadWriter
+	writer types.Package
 }
 
 func (b *builder) Build(opts *types.BuildOptions) error {
@@ -97,7 +97,7 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 	}
 	if err := b.writer.Put(&types.Artifact{
 		Type: types.ArtifactImages,
-		Name: "manifest-images.tar",
+		Name: types.ManifestUserImagesFile,
 		Body: rdr,
 	}); err != nil {
 		return err
@@ -110,6 +110,7 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 			return err
 		}
 		if err := b.writer.Put(&types.Artifact{
+			Type: types.ArtifactEULA,
 			Name: types.ManifestEULAFile,
 			Body: f,
 		}); err != nil {
@@ -125,10 +126,11 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 		K3sVersion:  opts.K3sVersion,
 		Arch:        opts.Arch,
 	}
-	log.Debugf("Package meta: %+v\n", packageMeta)
+	log.Debugf("Appending meta: %+v\n", packageMeta)
 	if err := b.writer.PutMeta(&packageMeta); err != nil {
 		return err
 	}
+	log.Debugf("Complete package meta: %+v\n", b.writer.GetMeta())
 
 	log.Infof("Archiving version %q of bundle to %q\n", opts.BuildVersion, opts.Output)
 	return b.writer.ArchiveTo(opts.Output)

@@ -9,6 +9,9 @@ const ManifestMetaFile = "manifest.json"
 // ManifestEULAFile is the name used when archiving an EULA.
 const ManifestEULAFile = "EULA.txt"
 
+// ManifestUserImagesFile is the name of the tarball where detected images are stored in an archive.
+const ManifestUserImagesFile = "manifest-images.tar"
+
 // ServerTokenFile is the file where the secret token is written for joining
 // new control-plane instances in an HA setup.
 const ServerTokenFile = "/var/lib/rancher/k3s/server/server-token"
@@ -61,4 +64,6 @@ const (
 	ArtifactScript ArtifactType = "script"
 	// ArtifactManifest represents a kubernetes manifest artifact.
 	ArtifactManifest ArtifactType = "manifest"
+	// ArtifactEULA represents an End User License Agreement.
+	ArtifactEULA ArtifactType = "eula"
 )

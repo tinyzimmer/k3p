@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	v1 "github.com/tinyzimmer/k3p/pkg/build/archive/v1"
+	v1 "github.com/tinyzimmer/k3p/pkg/build/package/v1"
 	"github.com/tinyzimmer/k3p/pkg/cluster/node"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"

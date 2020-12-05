@@ -8,23 +8,23 @@ import (
 	"io/ioutil"
 )
 
-// BundleReadWriter is an interface to be implemented for use by a package bundler/extracter.
-// Different versions of how manifests are built can implement this interface.
-type BundleReadWriter interface {
-	// Put should store the provided artifact inside the archive.
+// Package is an interface to be implemented for use by a package bundler/extracter.
+// Different versions of how packages are built can implement this interface.
+type Package interface {
+	// Put should store the provided artifact inside the archive. The interface is responsible
+	// for appending the details of the artifact to the metadata.
 	Put(*Artifact) error
-	// PutMeta should store the package metadata inside the archive.
+	// PutMeta should merge the provided meta with any tracked internally by the interface.
 	PutMeta(meta *PackageMeta) error
 	// Read should populate the given artifact with the contents inside the archive.
 	Get(*Artifact) error
-	// GetMeta should return the metadata associated with the archive
-	GetMeta() (*PackageMeta, error)
-	// GetManifest should retrieve readable copies of the entire contents of the archive.
-	GetManifest() (*PackageManifest, error)
+	// GetMeta should return the metadata associated with the package. This will contain information
+	// on the full contents of the package.
+	GetMeta() *PackageMeta
 	// ArchiveTo should tar the contents of the archive (with any required meta) to the given
 	// path.
 	ArchiveTo(path string) error
-	// Close should cleanup the interface's working directory.
+	// Close should perform any necessary cleanup.
 	Close() error
 }
 
@@ -53,19 +53,4 @@ func (a *Artifact) Verify(sha256sum string) error {
 		return fmt.Errorf("sha256 mismatch in %s %s", a.Type, a.Name)
 	}
 	return nil
-}
-
-// PackageManifest represents the complete contents of a packaged k3s system.
-type PackageManifest struct {
-	Bins, Scripts, Images, Manifests []*Artifact
-}
-
-// NewPackageManifest initializes a manifest with empty slices.
-func NewPackageManifest() *PackageManifest {
-	return &PackageManifest{
-		Bins:      make([]*Artifact, 0),
-		Scripts:   make([]*Artifact, 0),
-		Images:    make([]*Artifact, 0),
-		Manifests: make([]*Artifact, 0),
-	}
 }

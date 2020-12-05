@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	v1 "github.com/tinyzimmer/k3p/pkg/build/archive/v1"
+	v1 "github.com/tinyzimmer/k3p/pkg/build/package/v1"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 	"github.com/tinyzimmer/k3p/pkg/util"
@@ -52,26 +52,25 @@ func (i *installer) Install(target types.Node, opts *types.InstallOptions) error
 	}
 	defer pkg.Close()
 
-	// check package for a EULA
-	eula := &types.Artifact{Name: types.ManifestEULAFile}
-	if err := pkg.Get(eula); err == nil {
-		// EULA found
-		if err := promptEULA(eula, opts.AcceptEULA); err != nil {
+	// retrieve the full contents of the package
+	meta := pkg.GetMeta()
+
+	if meta.Manifest.EULA != "" {
+		// check package for a EULA
+		eula := &types.Artifact{Name: types.ManifestEULAFile}
+		if err := pkg.Get(eula); err == nil {
+			// EULA found
+			if err := promptEULA(eula, opts.AcceptEULA); err != nil {
+				return err
+			}
+		} else if !os.IsNotExist(err) {
+			// Error other than file not found
 			return err
 		}
-	} else if !os.IsNotExist(err) {
-		// Error other than file not found
-		return err
-	}
-
-	// retrieve the full contents of the package
-	manifest, err := pkg.GetManifest()
-	if err != nil {
-		return err
 	}
 
 	// unpack the manifest into the appropriate locations
-	if err := util.SyncManifestToNode(target, manifest); err != nil {
+	if err := util.SyncPackageToNode(target, pkg); err != nil {
 		return err
 	}
 
@@ -168,7 +167,8 @@ func generateK3sInstallCommand(target types.Node, opts *types.InstallOptions) (s
 		// append --cluster-init to enable clustering (https://rancher.com/docs/k3s/latest/en/installation/ha-embedded/)
 		opts.K3sExecArgs = opts.K3sExecArgs + " --cluster-init"
 	} else if opts.ServerURL != "" && opts.NodeToken != "" {
-		cmd = cmd + fmt.Sprintf("K3S_URL=%q K3S_TOKEN=%q ", opts.ServerURL, opts.NodeToken)
+		token = opts.NodeToken
+		cmd = cmd + fmt.Sprintf("K3S_URL=%q K3S_TOKEN=%q ", opts.ServerURL, token)
 	}
 
 	if opts.K3sExecArgs != "" {

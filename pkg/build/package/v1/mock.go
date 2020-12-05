@@ -38,7 +38,7 @@ func Mock() io.ReadCloser {
 	if err != nil {
 		panic(err)
 	}
-	writer := &readWriter{tmpDir}
+	writer := &readWriter{workDir: tmpDir, meta: types.NewEmptyMeta()}
 	defer writer.Close()
 	for _, artifact := range mockArtifacts {
 		if err := writer.Put(artifact); err != nil {

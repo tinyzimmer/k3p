@@ -5,7 +5,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	v1 "github.com/tinyzimmer/k3p/pkg/build/archive/v1"
+	v1 "github.com/tinyzimmer/k3p/pkg/build/package/v1"
+	"github.com/tinyzimmer/k3p/pkg/types"
 )
 
 func init() {
@@ -26,30 +27,57 @@ var inspectCmd = &cobra.Command{
 			return err
 		}
 		defer pkg.Close()
-		manifest, err := pkg.GetManifest()
-		if err != nil {
-			return err
-		}
-		fmt.Println("NAME:", args[0])
+
+		meta := pkg.GetMeta()
+
 		fmt.Println()
-		fmt.Println("BINARIES")
-		for _, bin := range manifest.Bins {
-			fmt.Println("    ", bin.Name, "\t", byteCountSI(bin.Size))
-		}
+		fmt.Println("NAME:   ", meta.Name)
+		fmt.Println("VERSION:", meta.Version)
 		fmt.Println()
-		fmt.Println("SCRIPTS")
-		for _, sc := range manifest.Scripts {
-			fmt.Println("    ", sc.Name, "\t", byteCountSI(sc.Size))
-		}
+		fmt.Println("ARCH:       ", meta.Arch)
+		fmt.Println("K3S VERSION:", meta.K3sVersion)
+
 		fmt.Println()
-		fmt.Println("IMAGES")
-		for _, img := range manifest.Images {
-			fmt.Println("    ", img.Name, "\t", byteCountSI(img.Size))
-		}
+		fmt.Println("CONTENTS:")
+
 		fmt.Println()
-		fmt.Println("MANIFESTS")
-		for _, mani := range manifest.Manifests {
-			fmt.Println("    ", mani.Name, "\t", byteCountSI(mani.Size))
+		fmt.Println("  BINARIES")
+		for _, bin := range meta.Manifest.Bins {
+			artifact := &types.Artifact{Type: types.ArtifactBin, Name: bin}
+			if err := pkg.Get(artifact); err != nil {
+				return err
+			}
+			fmt.Println("    ", artifact.Name, "\t", byteCountSI(artifact.Size))
+		}
+
+		fmt.Println()
+		fmt.Println("  SCRIPTS")
+		for _, sc := range meta.Manifest.Scripts {
+			artifact := &types.Artifact{Type: types.ArtifactScript, Name: sc}
+			if err := pkg.Get(artifact); err != nil {
+				return err
+			}
+			fmt.Println("    ", artifact.Name, "\t", byteCountSI(artifact.Size))
+		}
+
+		fmt.Println()
+		fmt.Println("  IMAGES")
+		for _, img := range meta.Manifest.Images {
+			artifact := &types.Artifact{Type: types.ArtifactImages, Name: img}
+			if err := pkg.Get(artifact); err != nil {
+				return err
+			}
+			fmt.Println("    ", artifact.Name, "\t", byteCountSI(artifact.Size))
+		}
+
+		fmt.Println()
+		fmt.Println("  MANIFESTS")
+		for _, mani := range meta.Manifest.K8sManifests {
+			artifact := &types.Artifact{Type: types.ArtifactManifest, Name: mani}
+			if err := pkg.Get(artifact); err != nil {
+				return err
+			}
+			fmt.Println("    ", artifact.Name, "\t", byteCountSI(artifact.Size))
 		}
 		fmt.Println()
 		return nil

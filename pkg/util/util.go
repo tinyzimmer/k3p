@@ -57,35 +57,47 @@ func GenerateToken(length int) string {
 	return string(b)
 }
 
-// SyncManifestToNode is a convenience method for extracting the contents of a package manifest
+// SyncPackageToNode is a convenience method for extracting the contents of a package manifest
 // to a k3s node.
-func SyncManifestToNode(target types.Node, manifest *types.PackageManifest) error {
-	log.Info("Installing binaries to remote machine at", types.K3sBinDir)
-	for _, bin := range manifest.Bins {
-		if err := target.WriteFile(bin.Body, path.Join(types.K3sBinDir, bin.Name), "0755", bin.Size); err != nil {
+func SyncPackageToNode(target types.Node, pkg types.Package) error {
+	meta := pkg.GetMeta()
+
+	log.Info("Installing binaries to machine at", types.K3sBinDir)
+	for _, bin := range meta.Manifest.Bins {
+		if err := writePkgFileToNode(target, pkg, types.ArtifactBin, bin, types.K3sBinDir, "0755"); err != nil {
 			return err
 		}
 	}
 
-	log.Info("Installing scripts to remote machine at", types.K3sScriptsDir)
-	for _, script := range manifest.Scripts {
-		if err := target.WriteFile(script.Body, path.Join(types.K3sScriptsDir, script.Name), "0755", script.Size); err != nil {
+	log.Info("Installing scripts to machine at", types.K3sScriptsDir)
+	for _, script := range meta.Manifest.Scripts {
+		if err := writePkgFileToNode(target, pkg, types.ArtifactScript, script, types.K3sBinDir, "0755"); err != nil {
 			return err
 		}
 	}
 
-	log.Info("Installing images to remote machine at", types.K3sImagesDir)
-	for _, imgs := range manifest.Images {
-		if err := target.WriteFile(imgs.Body, path.Join(types.K3sImagesDir, imgs.Name), "0644", imgs.Size); err != nil {
+	log.Info("Installing images to machine at", types.K3sImagesDir)
+	for _, imgs := range meta.Manifest.Images {
+		if err := writePkgFileToNode(target, pkg, types.ArtifactImages, imgs, types.K3sImagesDir, "0644"); err != nil {
 			return err
 		}
 	}
 
-	log.Info("Installing manifests to remote machine at", types.K3sManifestsDir)
-	for _, mani := range manifest.Manifests {
-		if err := target.WriteFile(mani.Body, path.Join(types.K3sManifestsDir, mani.Name), "0644", mani.Size); err != nil {
+	log.Info("Installing manifests to machine at", types.K3sManifestsDir)
+	for _, mani := range meta.Manifest.K8sManifests {
+		if err := writePkgFileToNode(target, pkg, types.ArtifactManifest, mani, types.K3sManifestsDir, "0644"); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func writePkgFileToNode(target types.Node, pkg types.Package, t types.ArtifactType, name, destDir, mode string) error {
+	artifact := &types.Artifact{Type: t, Name: name}
+	if err := pkg.Get(artifact); err != nil {
+		return err
+	}
+	// artifact.Name will reflect the correct basename to use after a Get (in case it contains an internal leading directory)
+	// this needs to be fixed
+	return target.WriteFile(artifact.Body, path.Join(destDir, artifact.Name), mode, artifact.Size)
 }

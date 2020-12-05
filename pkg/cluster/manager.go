@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	v1 "github.com/tinyzimmer/k3p/pkg/build/archive/v1"
+	v1 "github.com/tinyzimmer/k3p/pkg/build/package/v1"
 	"github.com/tinyzimmer/k3p/pkg/cluster/node"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
@@ -61,11 +61,6 @@ func (m *manager) AddNode(opts *types.AddNodeOptions) error {
 	}
 	defer pkg.Close()
 
-	manifest, err := pkg.GetManifest()
-	if err != nil {
-		return err
-	}
-
 	var tokenRdr io.ReadCloser
 	switch opts.NodeRole {
 	case types.K3sRoleServer:
@@ -95,7 +90,7 @@ func (m *manager) AddNode(opts *types.AddNodeOptions) error {
 	}
 	defer newNode.Close()
 
-	if err := util.SyncManifestToNode(newNode, manifest); err != nil {
+	if err := util.SyncPackageToNode(newNode, pkg); err != nil {
 		return err
 	}
 
