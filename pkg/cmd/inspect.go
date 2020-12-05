@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	v1 "github.com/tinyzimmer/k3p/pkg/build/archive/v1"
@@ -16,7 +17,11 @@ var inspectCmd = &cobra.Command{
 	Short: "Inspect the given package",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		pkg, err := v1.Load(args[0])
+		f, err := os.Open(args[0])
+		if err != nil {
+			return err
+		}
+		pkg, err := v1.Load(f)
 		if err != nil {
 			return err
 		}

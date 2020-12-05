@@ -3,12 +3,14 @@ package types
 // Installer is an interface for laying a package manifest down on a system
 // and setting up K3s.
 type Installer interface {
-	Install(opts *InstallOptions) error
+	Install(node Node, opts *InstallOptions) error
 }
 
 // InstallOptions are options to pass to an installation
 type InstallOptions struct {
-	// The path to the tar archive
+	// The path to the tar archive. If a file, this is on the machine
+	// running the installation and not necessarily the node passed to
+	// Install().
 	TarPath string
 	// An optional name to give the node
 	NodeName string
@@ -27,6 +29,6 @@ type InstallOptions struct {
 	K3sExecArgs string
 	// Whether to run with --cluster-init
 	InitHA bool
-	// Whether to run as a server or agent\
+	// Whether to run as a server or agent
 	K3sRole K3sRole
 }

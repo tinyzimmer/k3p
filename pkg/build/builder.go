@@ -104,7 +104,7 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 			return err
 		}
 		if err := b.writer.Put(&types.Artifact{
-			Name: "EULA.txt",
+			Name: types.ManifestEULAFile,
 			Body: f,
 		}); err != nil {
 			return err

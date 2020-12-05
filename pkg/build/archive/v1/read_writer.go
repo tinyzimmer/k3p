@@ -29,14 +29,8 @@ func New(dir string) types.BundleReadWriter { return &readWriter{workDir: dir} }
 
 // Load will load the bundle from the given tar archive. TmpDir is the directory to temporarily
 // unarchive the contents to. If it is blank, the system default is used.
-func Load(tarPath string) (types.BundleReadWriter, error) {
-	// Open the archive
-	f, err := os.Open(tarPath)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
+func Load(rdr io.ReadCloser) (types.BundleReadWriter, error) {
+	defer rdr.Close()
 	// Create a work directory for the readwriter
 	workdir, err := util.GetTempDir()
 	if err != nil {
@@ -45,7 +39,7 @@ func Load(tarPath string) (types.BundleReadWriter, error) {
 	log.Debugf("Using temp dir: %q\n", workdir)
 
 	// Extract the contents of the archive into the workdir
-	tarReader := tar.NewReader(f)
+	tarReader := tar.NewReader(rdr)
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {

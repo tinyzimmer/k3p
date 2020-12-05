@@ -21,6 +21,10 @@ type AddNodeOptions struct {
 	*NodeConnectOptions
 	// The role to assign the new node.
 	NodeRole K3sRole
+	// When left empty, the machine running k3p is assumed to be the leader.
+	// Otherwise this host will be remoted into with the same connect options
+	// as used for the new node in order to retrieve installation files.
+	RemoteLeader string
 }
 
 // RemoveNodeOptions are options passed to a RemoveNode operation.
@@ -45,6 +49,7 @@ type ClusterManager interface {
 // Node is an interface for preparing and managing a system that will run K3s.
 type Node interface {
 	MkdirAll(dir string) error
+	GetFile(path string) (io.ReadCloser, error)
 	WriteFile(rdr io.ReadCloser, destination string, mode string, size int64) error
 	Execute(cmd string, logPrefix string) error
 	Close() error

@@ -3,6 +3,9 @@ package types
 // VersionLatest is a string signaling that the latest version should be retrieved for k3s.
 const VersionLatest string = "latest"
 
+// ManifestEULAFile is the name used when archiving an EULA.
+const ManifestEULAFile = "EULA.txt"
+
 // ServerTokenFile is the file where the secret token is written for joining
 // new control-plane instances in an HA setup.
 const ServerTokenFile = "/var/lib/rancher/k3s/server/server-token"

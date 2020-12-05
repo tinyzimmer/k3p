@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"path"
 	"strings"
@@ -20,15 +21,28 @@ type manager struct{}
 func (m *manager) RemoveNode(opts *types.RemoveNodeOptions) error { return nil }
 
 func (m *manager) AddNode(opts *types.AddNodeOptions) error {
-	// this function assumes port 6443, which is the default
-	//
-	// need to double check if this is actually configurable
-	log.Info("Determining current k3s external listening address")
-	remoteAddr, err := getExternalK3sAddr()
-	if err != nil {
-		return err
+
+	var remoteAddr string
+	var leader types.Node
+	var err error
+
+	if opts.RemoteLeader != "" {
+		remoteAddr = opts.RemoteLeader
+		connectOpts := *opts.NodeConnectOptions
+		connectOpts.Address = remoteAddr
+		leader, err = node.Connect(&connectOpts)
+		if err != nil {
+			return err
+		}
+	} else {
+		log.Info("Determining current k3s external listening address")
+		remoteAddr, err = getExternalK3sAddr()
+		if err != nil {
+			return err
+		}
+		log.Debug("K3s is listening on", remoteAddr)
+		leader = node.Local()
 	}
-	log.Debug("K3s is listening on", remoteAddr)
 
 	// The reason we send the manifest over in pieces is because I was having strange bugs
 	// with trying to send it over with the k3p binary and extract on the remote host.
@@ -36,7 +50,11 @@ func (m *manager) AddNode(opts *types.AddNodeOptions) error {
 	// The tarball was moving over, but then ended up being an empty file on the other end.
 	// Loading it locally and sending it in pieces works for now.
 	log.Info("Loading package manifest")
-	pkg, err := v1.Load(types.InstalledPackageFile)
+	f, err := leader.GetFile(types.InstalledPackageFile)
+	if err != nil {
+		return err
+	}
+	pkg, err := v1.Load(f)
 	if err != nil {
 		return err
 	}
@@ -47,18 +65,23 @@ func (m *manager) AddNode(opts *types.AddNodeOptions) error {
 		return err
 	}
 
-	var token []byte
+	var tokenRdr io.ReadCloser
 	switch opts.NodeRole {
 	case types.K3sRoleServer:
 		log.Debug("Reading server join token from", types.ServerTokenFile)
-		token, err = ioutil.ReadFile(types.ServerTokenFile)
+		tokenRdr, err = leader.GetFile(types.ServerTokenFile)
 	case types.K3sRoleAgent:
 		log.Debug("Reading agent join token from", types.AgentTokenFile)
-		token, err = ioutil.ReadFile(types.AgentTokenFile)
+		tokenRdr, err = leader.GetFile(types.AgentTokenFile)
 	default:
 		return fmt.Errorf("Invalid node role %s", opts.NodeRole)
 	}
+	if err != nil {
+		return err
+	}
+	defer tokenRdr.Close()
 
+	token, err := ioutil.ReadAll(tokenRdr)
 	if err != nil {
 		return err
 	}

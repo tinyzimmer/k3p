@@ -3,22 +3,29 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
 	"os/user"
+	"path"
+	"syscall"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
 
+	"github.com/tinyzimmer/k3p/pkg/cluster/node"
 	"github.com/tinyzimmer/k3p/pkg/install"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 )
 
 var (
-	nodeRole    string
-	installOpts *types.InstallOptions
+	nodeRole           string
+	installOpts        *types.InstallOptions
+	installConnectOpts *types.NodeConnectOptions
 )
 
 func init() {
 	installOpts = &types.InstallOptions{}
+	installConnectOpts = &types.NodeConnectOptions{}
 
 	installCmd.Flags().StringVarP(&installOpts.NodeName, "node-name", "n", "", "An optional name to give this node in the cluster")
 	installCmd.Flags().BoolVar(&installOpts.AcceptEULA, "accept-eula", false, "Automatically accept any EULA included with the package")
@@ -35,16 +42,33 @@ be used for registering new servers, instead of one being generated.
 `)
 	installCmd.Flags().StringVar(&installOpts.ResolvConf, "resolv-conf", "", "The path of a resolv-conf file to use when configuring DNS in the cluster")
 	installCmd.Flags().StringVar(&installOpts.KubeconfigMode, "kubeconfig-mode", "", "The mode to set on the k3s kubeconfig. Default is to only allow root access")
-	installCmd.Flags().StringVar(&installOpts.K3sExecArgs, "k3s-exec", "", `
-Extra arguments to pass to the k3s server or agent process, for more details see:
+	installCmd.Flags().StringVar(&installOpts.K3sExecArgs, "k3s-exec", "", `Extra arguments to pass to the k3s server or agent process, for more details see:
 
 https://rancher.com/docs/k3s/latest/en/installation/install-options/server-config
 `)
-	installCmd.Flags().BoolVar(&installOpts.InitHA, "init-ha", false, `
-When set, this server will run with the --cluster-init flag to enable clustering, 
+	installCmd.Flags().BoolVar(&installOpts.InitHA, "init-ha", false, `When set, this server will run with the --cluster-init flag to enable clustering, 
 and a token will be generated for adding additional servers to the cluster with 
 "--join-role server". You may optionally use the --join-token flag to provide a 
 pre-generated one.`)
+
+	// Remote installation options
+
+	u, err := user.Current()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var defaultKeyArg string
+	defaultKeyPath := path.Join(u.HomeDir, ".ssh", "id_rsa")
+	if _, err := os.Stat(defaultKeyPath); err == nil {
+		defaultKeyArg = defaultKeyPath
+	}
+
+	installCmd.Flags().StringVarP(&installConnectOpts.Address, "host", "H", "", "The IP or DNS name of a remote host to perform the installation against")
+	installCmd.Flags().StringVarP(&installConnectOpts.SSHUser, "ssh-user", "u", u.Username, "The username to use when authenticating against the remote host")
+	installCmd.Flags().StringVarP(&installConnectOpts.SSHKeyFile, "private-key", "k", defaultKeyArg, `The path to a private key to use when authenticating against the remote host, 
+if not provided you will be prompted for a password`)
+	installCmd.Flags().IntVarP(&installConnectOpts.SSHPort, "ssh-port", "p", 22, "The port to use when connecting to the remote host over SSH")
 
 	rootCmd.AddCommand(installCmd)
 }
@@ -73,9 +97,6 @@ See the help below for additional information on available flags.
 		if err != nil {
 			return err
 		}
-		if usr.Uid != "0" {
-			return errors.New("Install must be run as root")
-		}
 
 		// Assign the package path to the opts
 		installOpts.TarPath = args[0]
@@ -92,8 +113,28 @@ See the help below for additional information on available flags.
 			}
 		}
 
+		target := node.Local()
+		if installConnectOpts.Address != "" {
+			if installConnectOpts.SSHKeyFile == "" {
+				fmt.Printf("Enter SSH Password for %s: ", installConnectOpts.SSHUser)
+				bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+				if err != nil {
+					return err
+				}
+				installConnectOpts.SSHPassword = string(bytePassword)
+			}
+			target, err = node.Connect(installConnectOpts)
+			if err != nil {
+				return err
+			}
+		} else {
+			if usr.Uid != "0" {
+				return errors.New("Local install must be run as root")
+			}
+		}
+
 		// run the installation
-		err = install.New().Install(installOpts)
+		err = install.New().Install(target, installOpts)
 		if err != nil {
 			return err
 		}

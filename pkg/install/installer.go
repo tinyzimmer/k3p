@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,29 +26,33 @@ func New() types.Installer { return &installer{} }
 
 type installer struct{}
 
-func (i *installer) Install(opts *types.InstallOptions) error {
-	system := node.Local()
+func (i *installer) Install(target types.Node, opts *types.InstallOptions) error {
+	log.Info("Copying the archive to the rancher installation directory")
 
-	log.Info("Copying the package to the rancher installation directory")
-
-	f, err := getTarReader(opts.TarPath)
+	f, size, err := getTarReader(opts.TarPath)
 	if err != nil {
 		return err
 	}
 
-	if err := system.WriteFile(f, types.InstalledPackageFile, "0644", 0); err != nil {
+	if err := target.WriteFile(f, types.InstalledPackageFile, "0644", size); err != nil {
 		return err
 	}
 
 	log.Info("Extracting the archive")
-	pkg, err := v1.Load(types.InstalledPackageFile)
+	// need a fresh tar reader, as the WriteFile will seek and close the first one
+	f, err = target.GetFile(types.InstalledPackageFile)
+	if err != nil {
+		return err
+	}
+
+	pkg, err := v1.Load(f)
 	if err != nil {
 		return err
 	}
 	defer pkg.Close()
 
 	// check package for a EULA
-	eula := &types.Artifact{Name: "EULA.txt"}
+	eula := &types.Artifact{Name: types.ManifestEULAFile}
 	if err := pkg.Get(eula); err == nil {
 		// EULA found
 		if err := promptEULA(eula, opts.AcceptEULA); err != nil {
@@ -65,25 +70,35 @@ func (i *installer) Install(opts *types.InstallOptions) error {
 	}
 
 	// unpack the manifest into the appropriate locations
-	if err := node.SyncManifestToNode(system, manifest); err != nil {
+	if err := node.SyncManifestToNode(target, manifest); err != nil {
 		return err
 	}
 
 	log.Info("Running k3s installation script")
-	cmd := generateK3sInstallCommand(opts)
+	cmd := generateK3sInstallCommand(target, opts)
 
-	return system.Execute(cmd, "K3S")
+	return target.Execute(cmd, "K3S")
 }
 
-func getTarReader(path string) (io.ReadCloser, error) {
+func getTarReader(path string) (io.ReadCloser, int64, error) {
 	if strings.HasPrefix(path, "http") {
 		resp, err := http.Get(path)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
-		return resp.Body, nil
+		size := resp.Header.Get("Content-Length")
+		sizeInt, err := strconv.Atoi(size)
+		if err != nil {
+			return nil, 0, err
+		}
+		return resp.Body, int64(sizeInt), nil
 	}
-	return os.Open(path)
+	stat, err := os.Stat(path)
+	if err != nil {
+		return nil, 0, err
+	}
+	f, err := os.Open(path)
+	return f, stat.Size(), err
 }
 
 func promptEULA(eula *types.Artifact, autoAccept bool) error {
@@ -117,7 +132,7 @@ func promptEULA(eula *types.Artifact, autoAccept bool) error {
 	}
 }
 
-func generateK3sInstallCommand(opts *types.InstallOptions) string {
+func generateK3sInstallCommand(target types.Node, opts *types.InstallOptions) string {
 	var token string
 
 	cmd := `INSTALL_K3S_SKIP_DOWNLOAD="true" `
@@ -141,7 +156,7 @@ func generateK3sInstallCommand(opts *types.InstallOptions) string {
 			token = util.GenerateToken(128)
 		}
 		log.Debugf("Writing the contents of the token to %s\n", types.ServerTokenFile)
-		if err := ioutil.WriteFile(types.ServerTokenFile, []byte(strings.TrimSpace(token)), 0600); err != nil {
+		if err := target.WriteFile(ioutil.NopCloser(strings.NewReader(token)), types.ServerTokenFile, "0600", 128); err != nil {
 			// TODO: error handling, this is technically important
 			log.Error("Failed to write the server join token to the filesystem. Be sure to copy it down for future reference.")
 			log.Error(err)

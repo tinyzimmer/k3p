@@ -38,6 +38,12 @@ func init() {
 	nodesAddCmd.Flags().StringVarP(&nodeAddOpts.SSHKeyFile, "private-key", "k", defaultKeyArg, "A private key to use for SSH authentication, if not provided you will be prompted for a password")
 	nodesAddCmd.Flags().IntVarP(&nodeAddOpts.SSHPort, "ssh-port", "p", 22, "The port to use when connecting to the remote instance over SSH")
 	nodesAddCmd.Flags().StringVarP(&nodeAddRole, "node-role", "r", string(types.K3sRoleAgent), "Whether to join the instance as a 'server' or 'agent'")
+	nodesAddCmd.Flags().StringVarP(&nodeAddOpts.RemoteLeader, "leader", "L", "", `The IP address or DNS name of the leader of the cluster.
+
+When left unset, the machine running k3p is assumed to be the leader of the cluster. Otherwise,
+the provided host is remoted into, with the same connection options as for the new node, to retrieve
+the installation manifest.
+`)
 
 	nodesCmd.AddCommand(nodesAddCmd)
 	rootCmd.AddCommand(nodesCmd)

@@ -105,6 +105,14 @@ func Errorf(fstr string, args ...interface{}) {
 	errorLogger.Printf(fstr, args...)
 }
 
+// Fatal is a convenience wrapper around logging to the error logger
+// and exiting imediately.
+func Fatal(args ...interface{}) {
+	Error("Fatal exception ocurred")
+	Error(args...)
+	os.Exit(1)
+}
+
 // Debug is the equivalent of a log.Println on the debug logger.
 func Debug(args ...interface{}) {
 	if Verbose {
