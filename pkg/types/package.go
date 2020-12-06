@@ -1,11 +1,7 @@
 package types
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"fmt"
 	"io"
-	"io/ioutil"
 )
 
 // Package is an interface to be implemented for use by a package bundler/extracter.
@@ -21,44 +17,21 @@ type Package interface {
 	// GetMeta should return the metadata associated with the package. This will contain information
 	// on the full contents of the package.
 	GetMeta() *PackageMeta
-	// ArchiveTo should tar the contents of the archive (with any required meta) to the given
-	// path.
-	ArchiveTo(path string) error
-	// Reader returns an io.Reader containing the tar contents of the archive.
-	Reader() io.ReadCloser
-	// Size returns the archived size of the package.
-	Size() (int64, error)
-	// Close should perform any necessary cleanup.
+	// Archive should produce an Archive interface that can be used to read from the final package stream.
+	// This method should ensure any metadata and finalize the archive. Any changes made to the package after
+	// Archive is called will require another call to receive the latest changes.
+	Archive() (Archive, error)
+	// Close should perform any necessary cleanup on both this interface, and archives created from it.
 	Close() error
 }
 
-// Artifact represents an object to be placed or extracted from a bundle.
-type Artifact struct {
-	// The type of the artifact
-	Type ArtifactType
-	// The name of the artifact (this can include subdirectories)
-	Name string
-	// The size of the artifact, only populated on retrieval, or if made
-	// with the ArtifactFromReader method in the utils package.
-	Size int64
-	// The contents of the artifact
-	Body io.ReadCloser
-}
-
-// Verify will verify the contents of this artifact against the given sha256sum.
-// Note that this method will read the entire contents of the artifact into memory.
-func (a *Artifact) Verify(sha256sum string) error {
-	var buf bytes.Buffer
-	defer func() { a.Body = ioutil.NopCloser(&buf) }()
-	tee := io.TeeReader(a.Body, &buf)
-	defer a.Body.Close() // will pop off the stack first
-	h := sha256.New()
-	if _, err := io.Copy(h, tee); err != nil {
-		return err
-	}
-	localSum := fmt.Sprintf("%x", h.Sum(nil))
-	if localSum != sha256sum {
-		return fmt.Errorf("sha256 mismatch in %s %s", a.Type, a.Name)
-	}
-	return nil
+// Archive is an interface to be implemented by packagers/extracers. It contains the final contents
+// of the archive and methods for interacting with it.
+type Archive interface {
+	// Reader should return a simple io.ReadCloser for the archive.
+	Reader() io.ReadCloser
+	// WriteTo should dump the contents of the archive to the given file.
+	WriteTo(path string) error
+	// Size should return the size of the archive.
+	Size() int64
 }

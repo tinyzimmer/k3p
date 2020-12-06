@@ -12,6 +12,7 @@ import (
 	"github.com/tinyzimmer/k3p/pkg/cache"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
+	"github.com/tinyzimmer/k3p/pkg/util"
 )
 
 const (
@@ -54,10 +55,11 @@ func (b *builder) downloadK3sChecksums(version, arch string) error {
 	if err != nil {
 		return err
 	}
-	return b.writer.Put(&types.Artifact{
-		Name: "k3s-sha256sums.txt",
-		Body: rdr,
-	})
+	artifact, err := util.ArtifactFromReader(types.ArtifactType("misc"), "k3s-sha256sums.txt", rdr)
+	if err != nil {
+		return err
+	}
+	return b.writer.Put(artifact)
 }
 
 func (b *builder) downloadK3sInstallScript() error {
@@ -65,11 +67,11 @@ func (b *builder) downloadK3sInstallScript() error {
 	if err != nil {
 		return err
 	}
-	return b.writer.Put(&types.Artifact{
-		Type: types.ArtifactScript,
-		Name: "install.sh",
-		Body: rdr,
-	})
+	artifact, err := util.ArtifactFromReader(types.ArtifactScript, "install.sh", rdr)
+	if err != nil {
+		return err
+	}
+	return b.writer.Put(artifact)
 }
 
 func (b *builder) downloadK3sAirgapImages(version, arch string) error {
@@ -77,11 +79,11 @@ func (b *builder) downloadK3sAirgapImages(version, arch string) error {
 	if err != nil {
 		return err
 	}
-	return b.writer.Put(&types.Artifact{
-		Type: types.ArtifactImages,
-		Name: "k3s-airgap-images.tar",
-		Body: rdr,
-	})
+	artifact, err := util.ArtifactFromReader(types.ArtifactImages, "k3s-airgap-images.tar", rdr)
+	if err != nil {
+		return err
+	}
+	return b.writer.Put(artifact)
 }
 
 func (b *builder) downloadK3sBinary(version, arch string) error {
@@ -89,11 +91,11 @@ func (b *builder) downloadK3sBinary(version, arch string) error {
 	if err != nil {
 		return err
 	}
-	return b.writer.Put(&types.Artifact{
-		Type: types.ArtifactBin,
-		Name: "k3s",
-		Body: rdr,
-	})
+	artifact, err := util.ArtifactFromReader(types.ArtifactBin, "k3s", rdr)
+	if err != nil {
+		return err
+	}
+	return b.writer.Put(artifact)
 }
 
 func (b *builder) validateCheckSums(arch string) error {

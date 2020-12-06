@@ -11,6 +11,10 @@ GINKGO ?= $(GOBIN)/ginkgo
 # Builds the k3p binary
 build: $(BIN)
 
+install: $(BIN)
+	mkdir -p $(GOBIN)
+	cp $(BIN) $(GOBIN)/k3p
+
 # Runs k3p build with any extra arguments
 pkg: $(PACKAGE)
 
@@ -79,6 +83,9 @@ kubeconfig:
 
 deploy: $(BIN) $(PACKAGE) dist-node-1
 	$(MAKE) node-shell-1 CMD="sudo k3p install -v dist/package.tar"
+
+## All three of the below targets should produce the same result, but using different methods that
+## the CLI supports
 
 # ha-local will install an HA cluster, executing all commands from the local machine
 ha-local: $(BIN) $(PACKAGE)

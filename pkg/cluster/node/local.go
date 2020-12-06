@@ -29,11 +29,11 @@ func (l *localNode) GetFile(f string) (io.ReadCloser, error) { return os.Open(f)
 
 // size is ignored for local nodes
 func (l *localNode) WriteFile(rdr io.ReadCloser, dest string, mode string, size int64) error {
-	log.Debugf("Writing file to local system at %q with mode %q\n", dest, mode)
 	defer rdr.Close()
 	if err := l.MkdirAll(path.Dir(dest)); err != nil {
 		return err
 	}
+	log.Debugf("Writing file to local system at %q with mode %q\n", dest, mode)
 	u, err := strconv.ParseUint(mode, 0, 16)
 	if err != nil {
 		return err

@@ -4,3 +4,4 @@ vendor/
 *.tgz
 *.tar.gz
 *.coverprofile
+*.dat

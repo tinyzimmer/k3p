@@ -168,6 +168,7 @@ func (p *ManifestParser) ParseManifests() ([]*types.Artifact, error) {
 			Name: p.StripParseDir(file),
 			Type: types.ArtifactManifest,
 			Body: f,
+			Size: info.Size(),
 		})
 
 		return nil

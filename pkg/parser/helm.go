@@ -139,10 +139,11 @@ func (p *ManifestParser) packageHelmChartToManifest(chartPath string) (*types.Ar
 	}); err != nil {
 		return nil, err
 	}
-
+	outBytes := out.Bytes()
 	return &types.Artifact{
 		Type: types.ArtifactManifest,
 		Name: fmt.Sprintf("%s-helm-chart.yaml", path.Base(chartPath)),
-		Body: ioutil.NopCloser(bytes.NewReader(out.Bytes())),
+		Body: ioutil.NopCloser(bytes.NewReader(outBytes)),
+		Size: int64(len(outBytes)),
 	}, nil
 }

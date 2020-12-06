@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/tinyzimmer/k3p/pkg/log"
@@ -70,27 +71,29 @@ func SyncPackageToNode(target types.Node, pkg types.Package) error {
 
 	log.Info("Installing binaries to machine at", types.K3sBinDir)
 	for _, bin := range meta.Manifest.Bins {
-		if err := writePkgFileToNode(target, pkg, types.ArtifactBin, bin, types.K3sBinDir, "0755"); err != nil {
+		if err := writePkgFileToNode(target, pkg, types.ArtifactBin, path.Base(bin), types.K3sBinDir, "0755"); err != nil {
 			return err
 		}
 	}
 
 	log.Info("Installing scripts to machine at", types.K3sScriptsDir)
 	for _, script := range meta.Manifest.Scripts {
-		if err := writePkgFileToNode(target, pkg, types.ArtifactScript, script, types.K3sBinDir, "0755"); err != nil {
+		if err := writePkgFileToNode(target, pkg, types.ArtifactScript, path.Base(script), types.K3sBinDir, "0755"); err != nil {
 			return err
 		}
 	}
 
 	log.Info("Installing images to machine at", types.K3sImagesDir)
 	for _, imgs := range meta.Manifest.Images {
-		if err := writePkgFileToNode(target, pkg, types.ArtifactImages, imgs, types.K3sImagesDir, "0644"); err != nil {
+		if err := writePkgFileToNode(target, pkg, types.ArtifactImages, path.Base(imgs), types.K3sImagesDir, "0644"); err != nil {
 			return err
 		}
 	}
 
 	log.Info("Installing manifests to machine at", types.K3sManifestsDir)
 	for _, mani := range meta.Manifest.K8sManifests {
+		// strip the prefix if it matches the base of the k3s dir
+		mani = strings.TrimPrefix(mani, path.Base(types.K3sManifestsDir)+"/")
 		if err := writePkgFileToNode(target, pkg, types.ArtifactManifest, mani, types.K3sManifestsDir, "0644"); err != nil {
 			return err
 		}
@@ -117,6 +120,8 @@ func writePkgFileToNode(target types.Node, pkg types.Package, t types.ArtifactTy
 // A finalizer is placed on the resulting artifact to ensure the temporary directory is cleaned up once the
 // artifact leaves runtime scope.
 func ArtifactFromReader(t types.ArtifactType, name string, rdr io.ReadCloser) (*types.Artifact, error) {
+	defer rdr.Close()
+
 	// Get a tempdir just for this artifact
 	tmpDir, err := GetTempDir()
 	if err != nil {

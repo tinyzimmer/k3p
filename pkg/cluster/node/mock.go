@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 )
 
@@ -36,7 +35,6 @@ func (m *mockNode) GetFile(f string) (io.ReadCloser, error) {
 }
 
 func (m *mockNode) WriteFile(rdr io.ReadCloser, dest, mode string, size int64) error {
-	log.Debugf("Writing file to local system at %q with mode %q\n", dest, mode)
 	defer rdr.Close()
 	if err := m.MkdirAll(path.Dir(dest)); err != nil {
 		return err

@@ -36,6 +36,9 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 
 	if opts.Name == "" {
 		opts.Name = util.GetRandomName()
+		log.Infof("Generated name for package %q\n", opts.Name)
+	} else {
+		log.Infof("Building package %q\n", opts.Name)
 	}
 
 	if opts.K3sVersion == types.VersionLatest {
@@ -93,16 +96,20 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 	if err != nil {
 		return err
 	}
-	if err := b.writer.Put(&types.Artifact{
-		Type: types.ArtifactImages,
-		Name: types.ManifestUserImagesFile,
-		Body: rdr,
-	}); err != nil {
+	images, err := util.ArtifactFromReader(types.ArtifactImages, types.ManifestUserImagesFile, rdr)
+	if err != nil {
+		return err
+	}
+	if err := b.writer.Put(images); err != nil {
 		return err
 	}
 
 	if opts.EULAFile != "" {
 		log.Infof("Adding EULA from %q\n", opts.EULAFile)
+		stat, err := os.Stat(opts.EULAFile)
+		if err != nil {
+			return err
+		}
 		f, err := os.Open(opts.EULAFile)
 		if err != nil {
 			return err
@@ -111,6 +118,7 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 			Type: types.ArtifactEULA,
 			Name: types.ManifestEULAFile,
 			Body: f,
+			Size: stat.Size(),
 		}); err != nil {
 			return err
 		}
@@ -131,5 +139,9 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 	log.Debugf("Complete package meta: %+v\n", b.writer.GetMeta())
 
 	log.Infof("Archiving version %q of bundle to %q\n", opts.BuildVersion, opts.Output)
-	return b.writer.ArchiveTo(opts.Output)
+	archive, err := b.writer.Archive()
+	if err != nil {
+		return err
+	}
+	return archive.WriteTo(opts.Output)
 }

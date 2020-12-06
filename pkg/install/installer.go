@@ -26,28 +26,11 @@ func (i *installer) Install(target types.Node, pkg types.Package, opts *types.In
 
 	log.Info("Copying the archive to the rancher installation directory")
 
-	// This is not very efficient, need to find a way to make the Package Reader() deterministic
-	tmpDir, err := util.GetTempDir()
+	archive, err := pkg.Archive()
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(tmpDir)
-
-	tmpPath := path.Join(tmpDir, "package.tar")
-	if err := pkg.ArchiveTo(tmpPath); err != nil {
-		return err
-	}
-
-	stat, err := os.Stat(tmpPath)
-	if err != nil {
-		return err
-	}
-	f, err := os.Open(tmpPath)
-	if err != nil {
-		return err
-	}
-
-	if err := target.WriteFile(f, types.InstalledPackageFile, "0644", stat.Size()); err != nil {
+	if err := target.WriteFile(archive.Reader(), types.InstalledPackageFile, "0644", archive.Size()); err != nil {
 		return err
 	}
 

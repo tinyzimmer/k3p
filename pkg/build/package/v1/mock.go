@@ -44,14 +44,3 @@ func Mock() types.Package {
 	}
 	return writer
 }
-
-// MockSize returns the size of the mock package. Yes these aren't the
-// most efficient implementations, but they will do for testing.
-func MockSize() int64 {
-	mock := Mock()
-	size, err := mock.Size()
-	if err != nil {
-		panic(err)
-	}
-	return size
-}

@@ -2,15 +2,18 @@ package v1
 
 import (
 	"archive/tar"
-	"bufio"
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"os/user"
 	"path"
-	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
@@ -26,6 +29,8 @@ const (
 	scriptsDir = "scripts"
 	// manifestDir is the directory for storing manifests inside a package
 	manifestDir = "manifests"
+	// the tar file we use inside the workdir
+	tarFile = "package.tar"
 )
 
 // New returns a new v1 package writer.
@@ -36,79 +41,81 @@ func New(dir string) types.Package {
 	}
 }
 
-// Load will load the bundle from the given tar archive. TmpDir is the directory to temporarily
-// unarchive the contents to. If it is blank, the system default is used.
+// Load loads the given readcloser into a Package interface.
 func Load(rdr io.ReadCloser) (types.Package, error) {
 	defer rdr.Close()
-	// Create a work directory for the readwriter
-	workdir, err := util.GetTempDir()
+	workDir, err := util.GetTempDir()
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("Using temp dir: %q\n", workdir)
-
-	// Extract the contents of the archive into the workdir
-	tarReader := tar.NewReader(rdr)
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		switch header.Typeflag {
-		case tar.TypeDir:
-			if err := os.Mkdir(path.Join(workdir, header.Name), 0755); err != nil {
-				return nil, err
-			}
-		case tar.TypeReg:
-			out, err := os.Create(path.Join(workdir, header.Name))
-			if err != nil {
-				return nil, err
-			}
-			if _, err := io.Copy(out, tarReader); err != nil {
-				return nil, err
-			}
-			out.Close()
-		}
-	}
-
-	// Load the package meta
-	rawMeta, err := ioutil.ReadFile(path.Join(workdir, types.ManifestMetaFile))
+	pkg := &readWriter{workDir: workDir}
+	f, err := os.Create(pkg.tarFile())
 	if err != nil {
 		return nil, err
 	}
-	meta := types.NewEmptyMeta()
-	if err := json.Unmarshal(rawMeta, meta); err != nil {
+	defer f.Close()
+	if _, err := io.Copy(f, rdr); err != nil {
 		return nil, err
 	}
 
-	// Return a readwriter using the extracted directory
-	return &readWriter{workDir: workdir, meta: meta}, nil
+	artifact := &types.Artifact{Name: types.ManifestMetaFile}
+	if err := pkg.Get(artifact); err != nil {
+		return nil, err
+	}
+	rawMeta, err := ioutil.ReadAll(artifact.Body)
+	if err != nil {
+		return nil, err
+	}
+	var meta types.PackageMeta
+	if err := json.Unmarshal(rawMeta, &meta); err != nil {
+		return nil, err
+	}
+	pkg.meta = &meta
+	return pkg, nil
 }
 
 type readWriter struct {
 	workDir string
 	meta    *types.PackageMeta
-	rwmux   sync.Mutex
+}
+
+func (rw *readWriter) tarFile() string {
+	return path.Join(rw.workDir, tarFile)
+}
+
+func (rw *readWriter) getTarWriter() (*tar.Writer, error) {
+	if fileExists(rw.tarFile()) {
+		f, err := os.OpenFile(rw.tarFile(), os.O_RDWR, os.ModePerm)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := f.Seek(-1024, os.SEEK_END); err != nil {
+			return nil, err
+		}
+		return tar.NewWriter(f), nil
+	}
+	f, err := os.Create(rw.tarFile())
+	if err != nil {
+		return nil, err
+	}
+	return tar.NewWriter(f), nil
 }
 
 func (rw *readWriter) Put(artifact *types.Artifact) error {
 	defer artifact.Body.Close()
-	outPath := path.Join(rw.dirFromType(artifact.Type), artifact.Name)
-	if err := os.MkdirAll(path.Dir(outPath), 0755); err != nil {
-		return err
-	}
-	out, err := os.Create(outPath)
+	tarWriter, err := rw.getTarWriter()
 	if err != nil {
 		return err
 	}
-	if _, err = io.Copy(out, artifact.Body); err != nil {
+	defer tarWriter.Close()
+	header := genArtifactHeader(artifact)
+	log.Debug("Generated header for artifact", header)
+	if err := tarWriter.WriteHeader(header); err != nil {
 		return err
 	}
-	rw.appendMeta(artifact.Type, outPath)
-	return nil
+	_, err = io.Copy(tarWriter, artifact.Body)
+	rw.appendMeta(artifact.Type, header.Name)
+	return err
 }
 
 func (rw *readWriter) PutMeta(meta *types.PackageMeta) error {
@@ -122,188 +129,140 @@ func (rw *readWriter) PutMeta(meta *types.PackageMeta) error {
 func (rw *readWriter) GetMeta() *types.PackageMeta { return rw.meta }
 
 func (rw *readWriter) Get(artifact *types.Artifact) error {
-	var filePath string
-
-	// this is a terrible hack
-	if rw.hasDirPrefix(artifact.Type, artifact.Name) {
-		filePath = path.Join(rw.workDir, artifact.Name)
-		artifact.Name = rw.stripLocalDirPrefix(artifact.Type, artifact.Name)
-	} else {
-		filePath = path.Join(rw.dirFromType(artifact.Type), artifact.Name)
+	searchName := artifact.Name
+	if !rw.hasDirPrefix(artifact) {
+		searchName = path.Join(dirFromType(artifact.Type), artifact.Name)
 	}
-
-	stat, err := os.Stat(filePath)
+	f, err := os.Open(rw.tarFile())
 	if err != nil {
 		return err
 	}
-	f, err := os.Open(filePath)
-	if err != nil {
-		return err
-	}
-	artifact.Body = f
-	artifact.Size = stat.Size()
-	return nil
-}
-
-// This is not deterministic with size at the moment
-func (rw *readWriter) Reader() io.ReadCloser {
-	r, w := io.Pipe()
-	writer := bufio.NewWriter(w)
-	reader := bufio.NewReader(r)
-	go func() {
-		defer w.Close()
-		if err := rw.archiveToWriter(writer); err != nil {
-			log.Error(err)
+	rdr := tar.NewReader(f)
+	for {
+		header, err := rdr.Next()
+		if err != nil {
+			if err != io.EOF {
+				return err
+			}
+			// reached end of file and did not find artifact
+			return fmt.Errorf("%s artifact %q not found", artifact.Type, artifact.Name)
 		}
-	}()
-	return ioutil.NopCloser(reader)
-}
-
-type sizer struct {
-	size int64
-}
-
-func (s *sizer) Write(p []byte) (int, error) {
-	s.size += int64(len(p))
-	return len(p), nil
-}
-
-func (s *sizer) count() int64 { return s.size }
-
-func (rw *readWriter) Size() (int64, error) {
-	sizer := &sizer{}
-	if err := rw.archiveToWriter(sizer); err != nil {
-		return 0, err
+		// Only evaluate files
+		if header.Typeflag != tar.TypeReg {
+			continue
+		}
+		// Check if this is the right artifact
+		if header.Name != searchName {
+			continue
+		}
+		// We have the right artifact populate the provided object and return
+		artifact.Body = ioutil.NopCloser(rdr)
+		artifact.Size = header.Size
+		// this produces a race condition, but should really make sure file is properly closed
+		// and not rely on waiting for the program to exit
+		// runtime.SetFinalizer(artifact, func(_ *types.Artifact) { f.Close() })
+		return nil
 	}
-	return sizer.count(), nil
 }
 
-func (rw *readWriter) ArchiveTo(path string) error {
-	f, err := os.Create(path)
+func (rw *readWriter) Archive() (types.Archive, error) {
+	rawMeta, err := json.MarshalIndent(rw.meta, "", "  ")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer f.Close()
-	return rw.archiveToWriter(f)
+	artifact := &types.Artifact{
+		Name: types.ManifestMetaFile,
+		Body: ioutil.NopCloser(bytes.NewReader(rawMeta)),
+		Size: int64(len(rawMeta)),
+	}
+	if err := rw.Put(artifact); err != nil {
+		return nil, err
+	}
+	stat, err := os.Stat(rw.tarFile())
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.Open(rw.tarFile())
+	if err != nil {
+		return nil, err
+	}
+	out := &archive{stat: stat, f: f}
+	runtime.SetFinalizer(out, func(_ *archive) { f.Close() })
+	return out, nil
 }
 
 func (rw *readWriter) Close() error {
 	return os.RemoveAll(rw.workDir)
 }
 
-func (rw *readWriter) archiveToWriter(w io.Writer) error {
-	rw.rwmux.Lock()
-	defer rw.rwmux.Unlock()
-
-	// Write the metadata file
-	meta, err := json.MarshalIndent(rw.GetMeta(), "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := ioutil.WriteFile(path.Join(rw.workDir, types.ManifestMetaFile), meta, 0644); err != nil {
-		return err
-	}
-
-	tw := tar.NewWriter(w)
-	defer tw.Close()
-
-	return filepath.Walk(rw.workDir, func(file string, fileInfo os.FileInfo, lastErr error) error {
-		if lastErr != nil {
-			return lastErr
-		}
-
-		// skip the root directory
-		if file == rw.workDir {
-			return nil
-		}
-
-		// generate tar header
-		header, err := tar.FileInfoHeader(fileInfo, file)
-		if err != nil {
-			return err
-		}
-
-		// provide a relative name
-		header.Name = rw.stripWorkdirPrefix(file)
-
-		// write header
-		if err := tw.WriteHeader(header); err != nil {
-			return err
-		}
-
-		// if a dir continue
-		if fileInfo.IsDir() {
-			return nil
-		}
-
-		// write the file to the tarball
-		data, err := os.Open(file)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(tw, data)
-		return err
-	})
-}
-
-func (rw *readWriter) stripWorkdirPrefix(path string) string {
-	return strings.Replace(path, rw.workDir+"/", "", 1)
-}
-
-func (rw *readWriter) appendMeta(t types.ArtifactType, fullLocalPath string) {
-	strippedPath := rw.stripWorkdirPrefix(fullLocalPath)
+func (rw *readWriter) appendMeta(t types.ArtifactType, tarPath string) {
 	switch t {
 	case types.ArtifactBin:
-		rw.meta.Manifest.Bins = append(rw.meta.Manifest.Bins, strippedPath)
+		rw.meta.Manifest.Bins = append(rw.meta.Manifest.Bins, tarPath)
 	case types.ArtifactImages:
-		rw.meta.Manifest.Images = append(rw.meta.Manifest.Images, strippedPath)
+		rw.meta.Manifest.Images = append(rw.meta.Manifest.Images, tarPath)
 	case types.ArtifactScript:
-		rw.meta.Manifest.Scripts = append(rw.meta.Manifest.Scripts, strippedPath)
+		rw.meta.Manifest.Scripts = append(rw.meta.Manifest.Scripts, tarPath)
 	case types.ArtifactManifest:
-		rw.meta.Manifest.K8sManifests = append(rw.meta.Manifest.K8sManifests, strippedPath)
+		rw.meta.Manifest.K8sManifests = append(rw.meta.Manifest.K8sManifests, tarPath)
 	case types.ArtifactEULA:
-		rw.meta.Manifest.EULA = strippedPath
+		rw.meta.Manifest.EULA = tarPath
 	}
 }
 
-func (rw *readWriter) hasDirPrefix(t types.ArtifactType, name string) bool {
-	switch t {
+func (rw *readWriter) hasDirPrefix(artifact *types.Artifact) bool {
+	switch artifact.Type {
 	case types.ArtifactBin:
-		return strings.HasPrefix(name, binDir)
+		return strings.HasPrefix(artifact.Name, binDir)
 	case types.ArtifactImages:
-		return strings.HasPrefix(name, imageDir)
+		return strings.HasPrefix(artifact.Name, imageDir)
 	case types.ArtifactScript:
-		return strings.HasPrefix(name, scriptsDir)
+		return strings.HasPrefix(artifact.Name, scriptsDir)
 	case types.ArtifactManifest:
-		return strings.HasPrefix(name, manifestDir)
+		return strings.HasPrefix(artifact.Name, manifestDir)
 	}
 	return false
 }
 
-func (rw *readWriter) stripLocalDirPrefix(t types.ArtifactType, name string) string {
+func dirFromType(t types.ArtifactType) string {
 	switch t {
 	case types.ArtifactBin:
-		return strings.TrimPrefix(name, binDir+"/")
+		return binDir
 	case types.ArtifactImages:
-		return strings.TrimPrefix(name, imageDir+"/")
+		return imageDir
 	case types.ArtifactScript:
-		return strings.TrimPrefix(name, scriptsDir+"/")
+		return scriptsDir
 	case types.ArtifactManifest:
-		return strings.TrimPrefix(name, manifestDir+"/")
+		return manifestDir
 	}
-	return name
+	return ""
 }
 
-func (rw *readWriter) dirFromType(t types.ArtifactType) string {
-	switch t {
-	case types.ArtifactBin:
-		return path.Join(rw.workDir, binDir)
-	case types.ArtifactImages:
-		return path.Join(rw.workDir, imageDir)
-	case types.ArtifactScript:
-		return path.Join(rw.workDir, scriptsDir)
-	case types.ArtifactManifest:
-		return path.Join(rw.workDir, manifestDir)
+func fileExists(path string) bool {
+	stat, err := os.Stat(path)
+	if err != nil {
+		return false
 	}
-	return rw.workDir // any other artifacts go to the root of the bundle
+	return !stat.IsDir()
+}
+
+func genArtifactHeader(artifact *types.Artifact) *tar.Header {
+	uid := 0
+	uname := "root"
+	if u, err := user.Current(); err == nil {
+		if uidInt, err := strconv.Atoi(u.Uid); err == nil {
+			uid = uidInt
+			uname = u.Username
+		}
+	}
+	now := time.Now()
+	return &tar.Header{
+		Typeflag: tar.TypeReg,
+		Name:     path.Join(dirFromType(artifact.Type), artifact.Name),
+		Size:     artifact.Size,
+		Mode:     0644,
+		Uid:      uid, Gid: uid,
+		Uname: uname, Gname: uname,
+		ModTime: now, AccessTime: now, ChangeTime: now,
+	}
 }

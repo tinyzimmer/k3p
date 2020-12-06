@@ -42,6 +42,7 @@ type remoteReadCloser struct {
 }
 
 func (r *remoteReadCloser) Read(p []byte) (int, error) { return r.pipe.Read(p) }
+
 func (r *remoteReadCloser) Close() error {
 	if err := r.sess.Wait(); err != nil {
 		return err
