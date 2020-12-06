@@ -8,10 +8,13 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"runtime"
 	"time"
 
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
+
+	"github.com/docker/docker/pkg/namesgenerator"
 )
 
 func init() {
@@ -24,6 +27,9 @@ var TempDir = os.TempDir()
 // GetTempDir is a utility function for retrieving a new temporary directory within either
 // the system default, or user-configured path.
 func GetTempDir() (string, error) { return ioutil.TempDir(TempDir, "") }
+
+// GetRandomName returns a random name using the docker name generator
+func GetRandomName() string { return namesgenerator.GetRandomName(0) }
 
 // CalculateSHA256Sum calculates the sha256sum of the contents of the given reader.
 func CalculateSHA256Sum(rdr io.Reader) (string, error) {
@@ -100,4 +106,61 @@ func writePkgFileToNode(target types.Node, pkg types.Package, t types.ArtifactTy
 	// artifact.Name will reflect the correct basename to use after a Get (in case it contains an internal leading directory)
 	// this needs to be fixed
 	return target.WriteFile(artifact.Body, path.Join(destDir, artifact.Name), mode, artifact.Size)
+}
+
+// ArtifactFromReader will create a new types.Artifact object with the name and type provided. Its contents
+// are populated by the reader. The purpose of this method is an easy way to determine the size of the
+// object, while taking care that it may be too large to place in memory. The reader is dumped to disk,
+// and then its size is queried from the filesystem. The Body of the returned artifact points to the file
+// on the system.
+//
+// A finalizer is placed on the resulting artifact to ensure the temporary directory is cleaned up once the
+// artifact leaves runtime scope.
+func ArtifactFromReader(t types.ArtifactType, name string, rdr io.ReadCloser) (*types.Artifact, error) {
+	// Get a tempdir just for this artifact
+	tmpDir, err := GetTempDir()
+	if err != nil {
+		return nil, err
+	}
+	tmpFile := path.Join(tmpDir, "file")
+
+	// Copy the reader to the temp file
+	f, err := os.Create(tmpFile)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := io.Copy(f, rdr); err != nil {
+		return nil, err
+	}
+
+	// Close the file to ensure the contents are flushed
+	if err := f.Close(); err != nil {
+		return nil, err
+	}
+
+	// Stat the file to get the size
+	stat, err := os.Stat(tmpFile)
+	if err != nil {
+		return nil, err
+	}
+
+	// Reopen the file for reading
+	f, err = os.Open(tmpFile)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build out the artifact
+	artifact := &types.Artifact{
+		Type: t,
+		Name: name,
+		Size: stat.Size(),
+		Body: f,
+	}
+
+	// Set a finalizer on the artifact to remove the tempdir
+	runtime.SetFinalizer(artifact, func(_ *types.Artifact) { os.RemoveAll(tmpDir) })
+
+	return artifact, nil
 }

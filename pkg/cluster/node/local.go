@@ -47,7 +47,9 @@ func (l *localNode) WriteFile(rdr io.ReadCloser, dest string, mode string, size 
 	return err
 }
 
-func (l *localNode) Execute(cmd string, logPrefix string) error {
+func (l *localNode) Execute(opts *types.ExecuteOptions) error {
+	cmd := buildCmdFromExecOpts(opts)
+	log.Debug("Executing command on local system:", redactSecrets(cmd, opts.Secrets))
 	c := exec.Command("/bin/sh", "-c", cmd)
 	outPipe, err := c.StdoutPipe()
 	if err != nil {
@@ -57,7 +59,7 @@ func (l *localNode) Execute(cmd string, logPrefix string) error {
 	if err != nil {
 		return err
 	}
-	go log.TailReader(logPrefix, outPipe)
-	go log.TailReader(logPrefix, errPipe)
+	go log.TailReader(opts.LogPrefix, outPipe)
+	go log.TailReader(opts.LogPrefix, errPipe)
 	return c.Run()
 }

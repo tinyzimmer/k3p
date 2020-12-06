@@ -93,7 +93,7 @@ func (n *remoteNode) MkdirAll(dir string) error {
 	return sess.Run(cmd)
 }
 
-func (n *remoteNode) Execute(cmd string, logPrefix string) error {
+func (n *remoteNode) Execute(opts *types.ExecuteOptions) error {
 	sess, err := n.client.NewSession()
 	if err != nil {
 		return err
@@ -106,8 +106,10 @@ func (n *remoteNode) Execute(cmd string, logPrefix string) error {
 	if err != nil {
 		return err
 	}
-	go log.TailReader(logPrefix, outPipe)
-	go log.TailReader(logPrefix, errPipe)
+	cmd := buildCmdFromExecOpts(opts)
+	log.Debug("Executing command on remote:", redactSecrets(cmd, opts.Secrets))
+	go log.TailReader(opts.LogPrefix, outPipe)
+	go log.TailReader(opts.LogPrefix, errPipe)
 	return sess.Run(cmd)
 }
 

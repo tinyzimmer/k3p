@@ -3,14 +3,17 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/user"
 	"path"
+	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
 
+	v1 "github.com/tinyzimmer/k3p/pkg/build/package/v1"
 	"github.com/tinyzimmer/k3p/pkg/cluster/node"
 	"github.com/tinyzimmer/k3p/pkg/install"
 	"github.com/tinyzimmer/k3p/pkg/log"
@@ -19,6 +22,7 @@ import (
 
 var (
 	nodeRole           string
+	installDocker      bool
 	installOpts        *types.InstallOptions
 	installConnectOpts *types.NodeConnectOptions
 )
@@ -27,6 +31,7 @@ func init() {
 	installOpts = &types.InstallOptions{}
 	installConnectOpts = &types.NodeConnectOptions{}
 
+	installCmd.Flags().BoolVarP(&installDocker, "docker", "D", false, "Install the package to a docker container on the local system.")
 	installCmd.Flags().StringVarP(&installOpts.NodeName, "node-name", "n", "", "An optional name to give this node in the cluster")
 	installCmd.Flags().BoolVar(&installOpts.AcceptEULA, "accept-eula", false, "Automatically accept any EULA included with the package")
 	installCmd.Flags().StringVarP(&installOpts.ServerURL, "join", "j", "", "When installing an agent instance, the address of the server to join (e.g. https://myserver:6443)")
@@ -77,7 +82,7 @@ if not provided you will be prompted for a password`)
 
 var installCmd = &cobra.Command{
 	Use:   "install PACKAGE",
-	Short: "Install the given package to the system (requires root)",
+	Short: "Install the given package to the system",
 	Long: `
 The install command can be used to distribute a package built with "k3p build".
 
@@ -90,7 +95,9 @@ Example
 	$> k3p install /path/on/filesystem.tar
 	$> k3p install https://example.com/package.tar
 
-You can also direct the installation at a remote system over SSH via the --host flag.
+When running on the local system like above, you will need to have root privileges. You can also 
+direct the installation at a remote system over SSH via the --host flag. This will require the 
+remote user having passwordless sudo available to them.
 
     $> k3p install package.tar --host 192.168.1.100 [SSH_FLAGS]
 
@@ -104,8 +111,11 @@ See the help below for additional information on available flags.
 			return err
 		}
 
-		// Assign the package path to the opts
-		installOpts.TarPath = args[0]
+		// Retrieve the package from the command line
+		pkg, err := getPackage(args[0])
+		if err != nil {
+			return err
+		}
 
 		// check the node role to make sure it's valid if relevant
 		if installOpts.ServerURL != "" && nodeRole != "" {
@@ -134,14 +144,14 @@ See the help below for additional information on available flags.
 				return err
 			}
 		} else {
-			target = node.Local()
 			if usr.Uid != "0" {
 				return errors.New("Local install must be run as root")
 			}
+			target = node.Local()
 		}
 
 		// run the installation
-		err = install.New().Install(target, installOpts)
+		err = install.New().Install(target, pkg, installOpts)
 		if err != nil {
 			return err
 		}
@@ -149,4 +159,24 @@ See the help below for additional information on available flags.
 		log.Info("The cluster has been installed. For additional details run `kubectl cluster-info`.")
 		return nil
 	},
+}
+
+func getPackage(path string) (types.Package, error) {
+	if strings.HasPrefix(path, "http") {
+		log.Info("Downloading the archive from", path)
+		resp, err := http.Get(path)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		log.Info("Loading the archive")
+		return v1.Load(resp.Body)
+	}
+	log.Info("Loading the archive")
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return v1.Load(f)
 }

@@ -11,8 +11,6 @@ import (
 	"github.com/tinyzimmer/k3p/pkg/parser"
 	"github.com/tinyzimmer/k3p/pkg/types"
 	"github.com/tinyzimmer/k3p/pkg/util"
-
-	"github.com/docker/docker/pkg/namesgenerator"
 )
 
 // NewBuilder returns a new Builder for the given K3s version and architecture. If tmpDir
@@ -37,7 +35,7 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 	defer b.writer.Close()
 
 	if opts.Name == "" {
-		opts.Name = namesgenerator.GetRandomName(0)
+		opts.Name = util.GetRandomName()
 	}
 
 	if opts.K3sVersion == types.VersionLatest {

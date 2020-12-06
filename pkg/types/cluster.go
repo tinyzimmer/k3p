@@ -1,7 +1,5 @@
 package types
 
-import "io"
-
 // NodeConnectOptions are options for configuring a connection to a remote node.
 type NodeConnectOptions struct {
 	// The user to attempt to SSH into the remote node as.
@@ -37,20 +35,10 @@ type RemoveNodeOptions struct {
 
 // ClusterManager is an interface for managing the nodes in a k3s cluster.
 type ClusterManager interface {
-	// AddNode should add a new node to the k3s cluster. It should only be
-	// possible to use this method from the initial master instance.
+	// AddNode should add a new node to the k3s cluster.
 	AddNode(*AddNodeOptions) error
 	// RemoveNode should drain and remove the given node from the k3s cluster.
 	// If NodeConnectOptions are not nil and Uninstall is true, then k3s and
 	// all of its assets should be completely removed from the system.
 	RemoveNode(*RemoveNodeOptions) error
-}
-
-// Node is an interface for preparing and managing a system that will run K3s.
-type Node interface {
-	MkdirAll(dir string) error
-	GetFile(path string) (io.ReadCloser, error)
-	WriteFile(rdr io.ReadCloser, destination string, mode string, size int64) error
-	Execute(cmd string, logPrefix string) error
-	Close() error
 }

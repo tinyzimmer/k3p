@@ -1,8 +1,6 @@
 package v1
 
 import (
-	"bytes"
-	"io"
 	"io/ioutil"
 	"strings"
 
@@ -33,32 +31,27 @@ var mockArtifacts = []*types.Artifact{
 }
 
 // Mock returns a fake package that can be passed to v1.Load().
-func Mock() io.ReadCloser {
+func Mock() types.Package {
 	tmpDir, err := ioutil.TempDir("", "")
 	if err != nil {
 		panic(err)
 	}
 	writer := &readWriter{workDir: tmpDir, meta: types.NewEmptyMeta()}
-	defer writer.Close()
 	for _, artifact := range mockArtifacts {
 		if err := writer.Put(artifact); err != nil {
 			panic(err)
 		}
 	}
-	var buf bytes.Buffer
-	if err := writer.archiveToWriter(&buf); err != nil {
-		panic(err)
-	}
-	return ioutil.NopCloser(&buf)
+	return writer
 }
 
 // MockSize returns the size of the mock package. Yes these aren't the
 // most efficient implementations, but they will do for testing.
 func MockSize() int64 {
 	mock := Mock()
-	data, err := ioutil.ReadAll(mock)
+	size, err := mock.Size()
 	if err != nil {
 		panic(err)
 	}
-	return int64(len(data))
+	return size
 }

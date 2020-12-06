@@ -5,7 +5,6 @@ import (
 	"io"
 	"io/ioutil"
 	"path"
-	"strings"
 
 	v1 "github.com/tinyzimmer/k3p/pkg/build/package/v1"
 	"github.com/tinyzimmer/k3p/pkg/cluster/node"
@@ -95,15 +94,19 @@ func (m *manager) AddNode(opts *types.AddNodeOptions) error {
 	}
 
 	log.Infof("Joining instance as a new %s\n", opts.NodeRole)
-	cmd := buildInstallCmd(remoteAddr, tokenStr, string(opts.NodeRole))
-	log.Debug("Executing command on remote:", strings.Replace(cmd, tokenStr, "<redacted>", -1))
-	return newNode.Execute(cmd, "K3S")
+	execOpts := buildInstallOpts(remoteAddr, tokenStr, string(opts.NodeRole))
+	return newNode.Execute(execOpts)
 }
 
-func buildInstallCmd(remoteAddr, token, nodeRole string) string {
-	installCmd := fmt.Sprintf(
-		`sudo sh -c 'INSTALL_K3S_SKIP_DOWNLOAD="true" K3S_URL="https://%s:6443" K3S_TOKEN="%s" %s %s'`,
-		remoteAddr, token, path.Join(types.K3sScriptsDir, "install.sh"), nodeRole,
-	)
-	return installCmd
+func buildInstallOpts(remoteAddr, token, nodeRole string) *types.ExecuteOptions {
+	return &types.ExecuteOptions{
+		Env: map[string]string{
+			"INSTALL_K3S_SKIP_DOWNLOAD": "true",
+			"K3S_URL":                   fmt.Sprintf("https://%s:6443", remoteAddr),
+			"K3S_TOKEN":                 token,
+		},
+		Command:   fmt.Sprintf("sh %s %s", path.Join(types.K3sScriptsDir, "install.sh"), nodeRole),
+		LogPrefix: "K3S",
+		Secrets:   []string{token},
+	}
 }

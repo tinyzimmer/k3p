@@ -1,7 +1,6 @@
 package install
 
 import (
-	"io"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -12,9 +11,6 @@ import (
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 )
-
-func getMockReader(string) (io.ReadCloser, int64, error) { return v1.Mock(), v1.MockSize(), nil }
-func mockInstaller() *installer                          { return &installer{getMockReader} }
 
 func TestUtils(t *testing.T) {
 	log.LogWriter = GinkgoWriter
@@ -32,7 +28,7 @@ var _ = Describe("Installer", func() {
 	defer target.Close()
 
 	JustBeforeEach(func() {
-		err = mockInstaller().Install(target, &opts)
+		err = New().Install(target, v1.Mock(), &opts)
 	})
 
 	Context("With no error conditions present", func() {

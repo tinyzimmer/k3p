@@ -29,7 +29,7 @@ func (m *mockNode) rootedDir(f string) string {
 
 func (m *mockNode) Close() error { return os.RemoveAll(m.root) }
 
-func (m *mockNode) Execute(cmd, logPrefix string) error { return nil }
+func (m *mockNode) Execute(opts *types.ExecuteOptions) error { return nil }
 
 func (m *mockNode) GetFile(f string) (io.ReadCloser, error) {
 	return os.Open(m.rootedDir(f))

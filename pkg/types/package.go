@@ -24,21 +24,29 @@ type Package interface {
 	// ArchiveTo should tar the contents of the archive (with any required meta) to the given
 	// path.
 	ArchiveTo(path string) error
+	// Reader returns an io.Reader containing the tar contents of the archive.
+	Reader() io.ReadCloser
+	// Size returns the archived size of the package.
+	Size() (int64, error)
 	// Close should perform any necessary cleanup.
 	Close() error
 }
 
 // Artifact represents an object to be placed or extracted from a bundle.
-// It includes a helper Verify() method for validating the contents against
-// a provided sha256sum.
 type Artifact struct {
+	// The type of the artifact
 	Type ArtifactType
+	// The name of the artifact (this can include subdirectories)
 	Name string
-	Size int64 // only populated on retrieval, not needed for storage
+	// The size of the artifact, only populated on retrieval, or if made
+	// with the ArtifactFromReader method in the utils package.
+	Size int64
+	// The contents of the artifact
 	Body io.ReadCloser
 }
 
 // Verify will verify the contents of this artifact against the given sha256sum.
+// Note that this method will read the entire contents of the artifact into memory.
 func (a *Artifact) Verify(sha256sum string) error {
 	var buf bytes.Buffer
 	defer func() { a.Body = ioutil.NopCloser(&buf) }()

@@ -4,55 +4,54 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"os/exec"
 	"path"
-	"strconv"
 	"strings"
 	"time"
 
-	v1 "github.com/tinyzimmer/k3p/pkg/build/package/v1"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 	"github.com/tinyzimmer/k3p/pkg/util"
 )
 
 // New returns a new package installer.
-func New() types.Installer { return &installer{getTarReader: getTarReader} }
+func New() types.Installer { return &installer{} }
 
-type installer struct {
-	getTarReader func(path string) (io.ReadCloser, int64, error)
-}
+type installer struct{}
 
-func (i *installer) Install(target types.Node, opts *types.InstallOptions) error {
-	log.Info("Copying the archive to the rancher installation directory")
-
-	f, size, err := i.getTarReader(opts.TarPath)
-	if err != nil {
-		return err
-	}
-
-	if err := target.WriteFile(f, types.InstalledPackageFile, "0644", size); err != nil {
-		return err
-	}
-
-	log.Info("Extracting the archive")
-	// need a fresh tar reader, as the WriteFile will seek and close the first one
-	f, err = target.GetFile(types.InstalledPackageFile)
-	if err != nil {
-		return err
-	}
-
-	pkg, err := v1.Load(f)
-	if err != nil {
-		return err
-	}
+func (i *installer) Install(target types.Node, pkg types.Package, opts *types.InstallOptions) error {
 	defer pkg.Close()
 
-	// retrieve the full contents of the package
+	log.Info("Copying the archive to the rancher installation directory")
+
+	// This is not very efficient, need to find a way to make the Package Reader() deterministic
+	tmpDir, err := util.GetTempDir()
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	tmpPath := path.Join(tmpDir, "package.tar")
+	if err := pkg.ArchiveTo(tmpPath); err != nil {
+		return err
+	}
+
+	stat, err := os.Stat(tmpPath)
+	if err != nil {
+		return err
+	}
+	f, err := os.Open(tmpPath)
+	if err != nil {
+		return err
+	}
+
+	if err := target.WriteFile(f, types.InstalledPackageFile, "0644", stat.Size()); err != nil {
+		return err
+	}
+
+	// retrieve the meta to see if there is a EULA
 	meta := pkg.GetMeta()
 
 	if meta.Manifest.EULA != "" {
@@ -69,39 +68,18 @@ func (i *installer) Install(target types.Node, opts *types.InstallOptions) error
 		}
 	}
 
-	// unpack the manifest into the appropriate locations
+	// unpack the manifest onto the node
 	if err := util.SyncPackageToNode(target, pkg); err != nil {
 		return err
 	}
 
 	log.Info("Running k3s installation script")
-	cmd, err := generateK3sInstallCommand(target, opts)
+	execOpts, err := generateK3sInstallOpts(target, opts)
 	if err != nil {
 		return err
 	}
 
-	return target.Execute(cmd, "K3S")
-}
-
-func getTarReader(path string) (io.ReadCloser, int64, error) {
-	if strings.HasPrefix(path, "http") {
-		resp, err := http.Get(path)
-		if err != nil {
-			return nil, 0, err
-		}
-		size := resp.Header.Get("Content-Length")
-		sizeInt, err := strconv.Atoi(size)
-		if err != nil {
-			return nil, 0, err
-		}
-		return resp.Body, int64(sizeInt), nil
-	}
-	stat, err := os.Stat(path)
-	if err != nil {
-		return nil, 0, err
-	}
-	f, err := os.Open(path)
-	return f, stat.Size(), err
+	return target.Execute(execOpts)
 }
 
 func promptEULA(eula *types.Artifact, autoAccept bool) error {
@@ -135,21 +113,23 @@ func promptEULA(eula *types.Artifact, autoAccept bool) error {
 	}
 }
 
-func generateK3sInstallCommand(target types.Node, opts *types.InstallOptions) (string, error) {
+func generateK3sInstallOpts(target types.Node, opts *types.InstallOptions) (*types.ExecuteOptions, error) {
 	var token string
 
-	cmd := `INSTALL_K3S_SKIP_DOWNLOAD="true" `
+	env := map[string]string{
+		"INSTALL_K3S_SKIP_DOWNLOAD": "true",
+	}
 
 	if opts.NodeName != "" {
-		cmd = cmd + fmt.Sprintf("K3S_NODE_NAME=%q ", opts.NodeName)
+		env["K3S_NODE_NAME"] = opts.NodeName
 	}
 
 	if opts.ResolvConf != "" {
-		cmd = cmd + fmt.Sprintf("K3S_RESOLV_CONF=%q ", opts.ResolvConf)
+		env["K3S_RESOLV_CONF"] = opts.ResolvConf
 	}
 
 	if opts.KubeconfigMode != "" {
-		cmd = cmd + fmt.Sprintf("K3S_KUBECONFIG_MODE=%q ", opts.KubeconfigMode)
+		env["K3S_KUBECONFIG_MODE"] = opts.KubeconfigMode
 	}
 
 	// these are mutually exclusive, should be better documented
@@ -161,25 +141,30 @@ func generateK3sInstallCommand(target types.Node, opts *types.InstallOptions) (s
 		// There needs to be a better place for this
 		log.Debugf("Writing the contents of the server token to %s\n", types.ServerTokenFile)
 		if err := target.WriteFile(ioutil.NopCloser(strings.NewReader(token)), types.ServerTokenFile, "0600", 128); err != nil {
-			return "", err
+			return nil, err
 		}
-		cmd = cmd + fmt.Sprintf("K3S_TOKEN=%q ", token)
+		env["K3S_TOKEN"] = token
 		// append --cluster-init to enable clustering (https://rancher.com/docs/k3s/latest/en/installation/ha-embedded/)
 		opts.K3sExecArgs = opts.K3sExecArgs + " --cluster-init"
 	} else if opts.ServerURL != "" && opts.NodeToken != "" {
 		token = opts.NodeToken
-		cmd = cmd + fmt.Sprintf("K3S_URL=%q K3S_TOKEN=%q ", opts.ServerURL, token)
+		env["K3S_URL"] = opts.ServerURL
+		env["K3S_TOKEN"] = token
 	}
 
 	if opts.K3sExecArgs != "" {
-		cmd = cmd + fmt.Sprintf("INSTALL_K3S_EXEC=%q ", opts.K3sExecArgs)
+		env["INSTALL_K3S_EXEC"] = opts.K3sExecArgs
 	}
 
-	cmd = cmd + fmt.Sprintf("sudo -E sh %s %s", path.Join(types.K3sScriptsDir, "install.sh"), string(opts.K3sRole))
-	loggedCmd := cmd
+	secrets := []string{}
 	if token != "" {
-		loggedCmd = strings.Replace(loggedCmd, token, "<redacted>", -1)
+		secrets = []string{token}
 	}
-	log.Debug("Generated K3s installation command:", loggedCmd)
-	return cmd, nil
+
+	return &types.ExecuteOptions{
+		Env:       env,
+		Command:   fmt.Sprintf("sh %q %s", path.Join(types.K3sScriptsDir, "install.sh"), string(opts.K3sRole)),
+		LogPrefix: "K3S",
+		Secrets:   secrets,
+	}, nil
 }

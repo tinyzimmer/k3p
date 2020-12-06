@@ -78,7 +78,7 @@ kubeconfig:
 	@ssh $(NODE_USER)@$(call get-node,1) sudo cat /etc/rancher/k3s/k3s.yaml | sed 's/127.0.0.1/$(call get-node,1)/'
 
 deploy: $(BIN) $(PACKAGE) dist-node-1
-	$(MAKE) node-shell-1 CMD="sudo k3p install dist/package.tar"
+	$(MAKE) node-shell-1 CMD="sudo k3p install -v dist/package.tar"
 
 # ha-local will install an HA cluster, executing all commands from the local machine
 ha-local: $(BIN) $(PACKAGE)

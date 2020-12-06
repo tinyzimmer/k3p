@@ -2,6 +2,7 @@ package v1
 
 import (
 	"archive/tar"
+	"bufio"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -9,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
@@ -89,6 +91,7 @@ func Load(rdr io.ReadCloser) (types.Package, error) {
 type readWriter struct {
 	workDir string
 	meta    *types.PackageMeta
+	rwmux   sync.Mutex
 }
 
 func (rw *readWriter) Put(artifact *types.Artifact) error {
@@ -142,6 +145,39 @@ func (rw *readWriter) Get(artifact *types.Artifact) error {
 	return nil
 }
 
+// This is not deterministic with size at the moment
+func (rw *readWriter) Reader() io.ReadCloser {
+	r, w := io.Pipe()
+	writer := bufio.NewWriter(w)
+	reader := bufio.NewReader(r)
+	go func() {
+		defer w.Close()
+		if err := rw.archiveToWriter(writer); err != nil {
+			log.Error(err)
+		}
+	}()
+	return ioutil.NopCloser(reader)
+}
+
+type sizer struct {
+	size int64
+}
+
+func (s *sizer) Write(p []byte) (int, error) {
+	s.size += int64(len(p))
+	return len(p), nil
+}
+
+func (s *sizer) count() int64 { return s.size }
+
+func (rw *readWriter) Size() (int64, error) {
+	sizer := &sizer{}
+	if err := rw.archiveToWriter(sizer); err != nil {
+		return 0, err
+	}
+	return sizer.count(), nil
+}
+
 func (rw *readWriter) ArchiveTo(path string) error {
 	f, err := os.Create(path)
 	if err != nil {
@@ -151,9 +187,14 @@ func (rw *readWriter) ArchiveTo(path string) error {
 	return rw.archiveToWriter(f)
 }
 
-func (rw *readWriter) Close() error { return os.RemoveAll(rw.workDir) }
+func (rw *readWriter) Close() error {
+	return os.RemoveAll(rw.workDir)
+}
 
 func (rw *readWriter) archiveToWriter(w io.Writer) error {
+	rw.rwmux.Lock()
+	defer rw.rwmux.Unlock()
+
 	// Write the metadata file
 	meta, err := json.MarshalIndent(rw.GetMeta(), "", "  ")
 	if err != nil {

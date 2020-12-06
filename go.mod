@@ -24,9 +24,9 @@ require (
 	github.com/onsi/gomega v1.10.3
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
-	github.com/pkg/sftp v1.12.0
 	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/spf13/cobra v1.1.1
+	github.com/stretchr/testify v1.6.1 // indirect
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
 	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools v2.2.0+incompatible // indirect
