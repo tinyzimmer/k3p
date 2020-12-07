@@ -16,6 +16,21 @@ type PackageMeta struct {
 	Manifest Manifest `json:"manifest,omitempty"`
 }
 
+// GetName returns the name of the package.
+func (p *PackageMeta) GetName() string { return p.Name }
+
+// GetVersion returns the version of the package.
+func (p *PackageMeta) GetVersion() string { return p.Version }
+
+// GetK3sVersion returns the K3s version for the package.
+func (p *PackageMeta) GetK3sVersion() string { return p.K3sVersion }
+
+// GetArch returns the CPU architecture fo rthe package.
+func (p *PackageMeta) GetArch() string { return p.Arch }
+
+// GetManifest returns the manifest of the package.
+func (p *PackageMeta) GetManifest() Manifest { return p.Manifest }
+
 // NewEmptyMeta returns a new empty PackageMeta instance.
 func NewEmptyMeta() *PackageMeta {
 	return &PackageMeta{Manifest: NewEmptyManifest()}

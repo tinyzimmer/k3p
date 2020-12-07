@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/user"
 	"path"
@@ -12,12 +11,15 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/tinyzimmer/k3p/pkg/cluster"
+	"github.com/tinyzimmer/k3p/pkg/cluster/node"
+	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 )
 
 var (
-	nodeAddRole string
-	nodeAddOpts *types.AddNodeOptions
+	nodeAddRole         string
+	nodeAddRemoteLeader string
+	nodeAddOpts         *types.AddNodeOptions
 )
 
 func init() {
@@ -38,7 +40,7 @@ func init() {
 	nodesAddCmd.Flags().StringVarP(&nodeAddOpts.SSHKeyFile, "private-key", "k", defaultKeyArg, "A private key to use for SSH authentication, if not provided you will be prompted for a password")
 	nodesAddCmd.Flags().IntVarP(&nodeAddOpts.SSHPort, "ssh-port", "p", 22, "The port to use when connecting to the remote instance over SSH")
 	nodesAddCmd.Flags().StringVarP(&nodeAddRole, "node-role", "r", string(types.K3sRoleAgent), "Whether to join the instance as a 'server' or 'agent'")
-	nodesAddCmd.Flags().StringVarP(&nodeAddOpts.RemoteLeader, "leader", "L", "", `The IP address or DNS name of the leader of the cluster.
+	nodesAddCmd.Flags().StringVarP(&nodeAddRemoteLeader, "leader", "L", "", `The IP address or DNS name of the leader of the cluster.
 
 When left unset, the machine running k3p is assumed to be the leader of the cluster. Otherwise,
 the provided host is remoted into, with the same connection options as for the new node, to retrieve
@@ -79,6 +81,26 @@ var nodesAddCmd = &cobra.Command{
 			nodeAddOpts.SSHPassword = string(bytePassword)
 		}
 
-		return cluster.New().AddNode(nodeAddOpts)
+		var leader types.Node
+		var err error
+		if nodeAddRemoteLeader != "" {
+			connectOpts := *nodeAddOpts.NodeConnectOptions
+			connectOpts.Address = nodeAddRemoteLeader
+			log.Infof("Connecting to %s:%d\n", connectOpts.Address, connectOpts.SSHPort)
+			leader, err = node.Connect(&connectOpts)
+			if err != nil {
+				return err
+			}
+		} else {
+			leader = node.Local()
+		}
+
+		log.Infof("Connecting to %s:%d\n", nodeAddOpts.Address, nodeAddOpts.SSHPort)
+		newNode, err := node.Connect(nodeAddOpts.NodeConnectOptions)
+		if err != nil {
+			return err
+		}
+
+		return cluster.New(leader).AddNode(newNode, nodeAddOpts)
 	},
 }

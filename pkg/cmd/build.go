@@ -25,7 +25,7 @@ func init() {
 
 	buildOpts = &types.BuildOptions{}
 
-	buildCmd.Flags().StringVarP(&buildOpts.Name, "name", "n", "", "The name to give the package")
+	buildCmd.Flags().StringVarP(&buildOpts.Name, "name", "n", "", "The name to give the package, if not provided one will be generated")
 	buildCmd.Flags().StringVarP(&buildOpts.BuildVersion, "version", "V", types.VersionLatest, "The version to tag the package")
 	buildCmd.Flags().StringVar(&buildOpts.K3sVersion, "k3s-version", types.VersionLatest, "A specific k3s version to bundle with the package, overrides --channel")
 	buildCmd.Flags().StringVarP(&buildOpts.K3sChannel, "channel", "c", "stable", "The release channel to retrieve the version of k3s from")

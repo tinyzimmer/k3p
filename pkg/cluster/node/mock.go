@@ -55,3 +55,5 @@ func (m *mockNode) WriteFile(rdr io.ReadCloser, dest, mode string, size int64) e
 }
 
 func (m *mockNode) MkdirAll(path string) error { return os.MkdirAll(m.rootedDir(path), 0755) }
+
+func (m *mockNode) GetK3sAddress() (string, error) { return "", nil }

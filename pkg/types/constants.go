@@ -12,6 +12,9 @@ const ManifestEULAFile = "EULA.txt"
 // ManifestUserImagesFile is the name of the tarball where detected images are stored in an archive.
 const ManifestUserImagesFile = "manifest-images.tar"
 
+// K3sRootConfigDir is the root directory where k3s assets are stored
+const K3sRootConfigDir = "/var/lib/rancher/k3s"
+
 // ServerTokenFile is the file where the secret token is written for joining
 // new control-plane instances in an HA setup.
 const ServerTokenFile = "/var/lib/rancher/k3s/server/server-token"
@@ -39,8 +42,17 @@ const K3sBinDir = "/usr/local/bin"
 // K3sKubeconfig is the path where the admin kubeconfig is stored on the system.
 const K3sKubeconfig = "/etc/rancher/k3s/k3s.yaml"
 
-// K3sInternalIPLabel is the label K3s uses for the internal IP of a node
+// K3sInternalIPLabel is the label K3s uses for the internal IP of a node.
 const K3sInternalIPLabel = "k3s.io/internal-ip"
+
+// K3pDockerClusterLabel is the label placed on k3p docker assets containing the cluster name.
+const K3pDockerClusterLabel = "k3p.io/cluster-name"
+
+// K3pDockerNodeNameLabel is the label placed on k3p docker assets containing the node name.
+const K3pDockerNodeNameLabel = "k3p.io/node-name"
+
+// K3pDockerNodeRoleLabel is the label where the node role is placed.
+const K3pDockerNodeRoleLabel = "k3p.io/node-role"
 
 // K3sRole represents the different roles a machine can take in the cluster
 type K3sRole string

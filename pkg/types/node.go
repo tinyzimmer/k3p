@@ -29,6 +29,9 @@ type Node interface {
 	// to StartK3s or something as that is all it is used for, and will make more sense in the
 	// context of docker.
 	Execute(*ExecuteOptions) error
+	// GetK3sAddress should return the address where the k3s server is listening for connections
+	// on this node.
+	GetK3sAddress() (string, error)
 	// Close should close any open connections to the node and perform any necessary cleanup.
 	Close() error
 }

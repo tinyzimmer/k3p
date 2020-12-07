@@ -129,9 +129,6 @@ func (r *tmpReadCloser) Close() error {
 // object, while taking care that it may be too large to place in memory. The reader is dumped to disk,
 // and then its size is queried from the filesystem. The Body of the returned artifact points to the file
 // on the system.
-//
-// A finalizer is placed on the resulting artifact to ensure the temporary directory is cleaned up once the
-// artifact leaves runtime scope.
 func ArtifactFromReader(t types.ArtifactType, name string, rdr io.ReadCloser) (*types.Artifact, error) {
 	defer rdr.Close()
 

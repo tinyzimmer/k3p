@@ -1,19 +1,23 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"os/user"
 	"path"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
 
 	v1 "github.com/tinyzimmer/k3p/pkg/build/package/v1"
+	"github.com/tinyzimmer/k3p/pkg/cluster"
 	"github.com/tinyzimmer/k3p/pkg/cluster/node"
 	"github.com/tinyzimmer/k3p/pkg/install"
 	"github.com/tinyzimmer/k3p/pkg/log"
@@ -21,17 +25,19 @@ import (
 )
 
 var (
-	nodeRole           string
-	installDocker      bool
-	installOpts        *types.InstallOptions
-	installConnectOpts *types.NodeConnectOptions
+	nodeRole               string
+	installDocker          bool
+	installWriteKubeconfig string
+	installOpts            *types.InstallOptions
+	installConnectOpts     *types.NodeConnectOptions
+	installDockerOpts      *types.DockerClusterOptions
 )
 
 func init() {
 	installOpts = &types.InstallOptions{}
 	installConnectOpts = &types.NodeConnectOptions{}
+	installDockerOpts = &types.DockerClusterOptions{}
 
-	installCmd.Flags().BoolVarP(&installDocker, "docker", "D", false, "Install the package to a docker container on the local system (not yet implemented)")
 	installCmd.Flags().StringVarP(&installOpts.NodeName, "node-name", "n", "", "An optional name to give this node in the cluster")
 	installCmd.Flags().BoolVar(&installOpts.AcceptEULA, "accept-eula", false, "Automatically accept any EULA included with the package")
 	installCmd.Flags().StringVarP(&installOpts.ServerURL, "join", "j", "", "When installing an agent instance, the address of the server to join (e.g. https://myserver:6443)")
@@ -48,6 +54,7 @@ be used for registering new servers, instead of one being generated.`)
 	installCmd.Flags().StringVar(&installOpts.ResolvConf, "resolv-conf", "", `The path of a resolv-conf file to use when configuring DNS in the cluster.
 When used with the --host flag, the path must reside on the remote system (this will change in the future).`)
 
+	installCmd.Flags().StringVar(&installWriteKubeconfig, "write-kubeconfig", "", "Write a copy of the admin client to this file")
 	installCmd.Flags().StringVar(&installOpts.KubeconfigMode, "kubeconfig-mode", "", "The mode to set on the k3s kubeconfig. Default is to only allow root access")
 
 	installCmd.Flags().StringVar(&installOpts.K3sExecArgs, "k3s-exec", "", `Extra arguments to pass to the k3s server or agent process, for more details see:
@@ -77,6 +84,13 @@ pre-generated one.`)
 if not provided you will be prompted for a password`)
 	installCmd.Flags().IntVarP(&installConnectOpts.SSHPort, "ssh-port", "p", 22, "The port to use when connecting to the remote host over SSH")
 
+	// Docker options
+	installCmd.Flags().BoolVarP(&installDocker, "docker", "D", false, "Install the package to a docker container on the local system.")
+	installCmd.Flags().StringVar(&installDockerOpts.ClusterName, "cluster-name", "", "DOCKER ONLY: Override the name of the cluster (defaults to the package name)")
+	installCmd.Flags().IntVar(&installDockerOpts.Servers, "servers", 1, "DOCKER ONLY: The number of servers to run in the cluster")
+	installCmd.Flags().IntVar(&installDockerOpts.Agents, "agents", 0, "DOCKER ONLY: The number of agents to run in the cluster")
+	installCmd.Flags().IntVar(&installDockerOpts.APIPort, "api-port", 6443, "DOCKER ONLY: The port to bind to the k3s API server")
+
 	rootCmd.AddCommand(installCmd)
 }
 
@@ -105,12 +119,6 @@ See the help below for additional information on available flags.
 `,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// make sure we are root
-		usr, err := user.Current()
-		if err != nil {
-			return err
-		}
-
 		// Retrieve the package from the command line
 		pkg, err := getPackage(args[0])
 		if err != nil {
@@ -129,26 +137,27 @@ See the help below for additional information on available flags.
 			}
 		}
 
-		var target types.Node
-		if installConnectOpts.Address != "" {
-			if installConnectOpts.SSHKeyFile == "" {
-				fmt.Printf("Enter SSH Password for %s: ", installConnectOpts.SSHUser)
-				bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
-				if err != nil {
-					return err
-				}
-				installConnectOpts.SSHPassword = string(bytePassword)
+		// Do validations on any docker options
+		if installDocker {
+			installDockerOpts.K3sVersion = pkg.GetMeta().GetK3sVersion()
+			if installDockerOpts.ClusterName == "" {
+				installDockerOpts.ClusterName = pkg.GetMeta().GetName()
 			}
-			target, err = node.Connect(installConnectOpts)
-			if err != nil {
-				return err
+			if installDockerOpts.Servers&1 != 1 {
+				return errors.New("Docker node servers must be an odd number")
 			}
-		} else {
-			if usr.Uid != "0" {
-				return errors.New("Local install must be run as root")
+			if installDockerOpts.Servers > 1 {
+				installOpts.InitHA = true
 			}
-			target = node.Local()
 		}
+
+		// Get the node to run the installation against
+		target, err := getTargetNode(pkg)
+		if err != nil {
+			return err
+		}
+
+		defer target.Close()
 
 		// run the installation
 		err = install.New().Install(target, pkg, installOpts)
@@ -156,9 +165,177 @@ See the help below for additional information on available flags.
 			return err
 		}
 
-		log.Info("The cluster has been installed. For additional details run `kubectl cluster-info`.")
+		// If docker, add any extra nodes
+		if installDocker {
+			if err := setupDockerCluster(target); err != nil {
+				return err
+			}
+		}
+
+		// Retrieve and write a copy of the kubeconfig if requested
+		if installWriteKubeconfig != "" {
+			if err := writeKubeconfig(target); err != nil {
+				return err
+			}
+		}
+
+		logCompletion(target)
 		return nil
 	},
+}
+
+func logCompletion(target types.Node) {
+	log.Info("The cluster has been installed")
+	if installConnectOpts.Address != "" {
+		log.Infof("You can view the cluster by connecting to %s and running `k3s kubectl cluster-info`\n", installConnectOpts.Address)
+	} else if !installDocker {
+		log.Info("You can view the cluster by running `k3s kubectl cluster-info`")
+	} else {
+		if installWriteKubeconfig != "" {
+			log.Infof("You can view the cluster by running `kubectl --kubeconfig %s cluster-info`\n", installWriteKubeconfig)
+		} else {
+			if name, err := target.GetK3sAddress(); err == nil {
+				log.Infof("You can retrieve the kubeconfig by running `docker cp %s:%s ./kubeconfig.yaml`\n", name, types.K3sKubeconfig)
+			}
+		}
+	}
+}
+
+func getTargetNode(pkg types.Package) (types.Node, error) {
+	if installConnectOpts.Address != "" {
+		if installConnectOpts.SSHKeyFile == "" {
+			fmt.Printf("Enter SSH Password for %s: ", installConnectOpts.SSHUser)
+			bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+			if err != nil {
+				return nil, err
+			}
+			installConnectOpts.SSHPassword = string(bytePassword)
+		}
+		return node.Connect(installConnectOpts)
+	}
+	if installDocker {
+		target, err := node.NewDocker(&types.DockerNodeOptions{
+			ClusterOptions: installDockerOpts,
+			NodeIndex:      0,
+			NodeRole:       types.K3sRoleServer,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if target.(*node.Docker).IsK3sRunning() {
+			return nil, fmt.Errorf("Package %q is already running on the sytem", pkg.GetMeta().GetName())
+		}
+		return target, nil
+	}
+	// make sure we are root
+	usr, err := user.Current()
+	if err != nil {
+		return nil, err
+	}
+	if usr.Uid != "0" {
+		return nil, errors.New("Local install must be run as root")
+	}
+	return node.Local(), nil
+}
+
+func writeKubeconfig(target types.Node) error {
+	log.Info("Waiting for server to write the admin kubeconfig")
+
+	var kubeconfigStr string
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(30)*time.Second)
+	defer cancel()
+
+GetKubeconfig:
+	for {
+		select {
+		case <-ctx.Done():
+			return errors.New("Timeout reached waiting for server to write kubeconfig")
+		default:
+			rdr, err := target.GetFile(types.K3sKubeconfig)
+			if err != nil {
+				log.Debug("Error retrieving kubeconfig, will try again:", err)
+				time.Sleep(time.Duration(1) * time.Second)
+				continue
+			}
+			defer rdr.Close()
+			body, err := ioutil.ReadAll(rdr)
+			if err != nil {
+				return err
+			}
+			kubeconfigStr = string(body)
+			break GetKubeconfig
+		}
+	}
+
+	if installConnectOpts.Address != "" {
+		kubeconfigStr = strings.Replace(kubeconfigStr, "127.0.0.1", installConnectOpts.Address, 1)
+	} else if installDocker {
+		kubeconfigStr = strings.Replace(kubeconfigStr, "127.0.0.1:6443", fmt.Sprintf("127.0.0.1:%d", installDockerOpts.APIPort), 1)
+	}
+	log.Infof("Writing the kubeconfig to %q\n", installWriteKubeconfig)
+	return ioutil.WriteFile(installWriteKubeconfig, []byte(kubeconfigStr), 0644)
+}
+
+func setupDockerCluster(leader types.Node) error {
+	clusterManager := cluster.New(leader)
+	if installDockerOpts.Servers > 1 {
+		opts := &types.AddNodeOptions{
+			NodeRole: types.K3sRoleServer,
+		}
+		for i := 1; i < installDockerOpts.Servers; i++ {
+			server, err := node.NewDocker(&types.DockerNodeOptions{
+				ClusterOptions: installDockerOpts,
+				NodeIndex:      i,
+				NodeRole:       types.K3sRoleServer,
+			})
+			if err != nil {
+				return err
+			}
+			if err := clusterManager.AddNode(server, opts); err != nil {
+				return err
+			}
+		}
+	}
+
+	if installDockerOpts.Agents > 0 {
+		// Wait for the node token to get written to the system
+		log.Info("Waiting for k3s to write the server node-token")
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(30)*time.Second)
+		defer cancel()
+	GetNodeToken:
+		for {
+			select {
+			case <-ctx.Done():
+				return errors.New("Timeout reached waiting for server to write node-token")
+			default:
+				_, err := leader.GetFile(types.AgentTokenFile)
+				if err != nil {
+					log.Debug("Error retrieving node token, will try again:", err)
+					time.Sleep(time.Duration(1) * time.Second)
+					continue
+				}
+				break GetNodeToken
+			}
+		}
+		opts := &types.AddNodeOptions{
+			NodeRole: types.K3sRoleAgent,
+		}
+		for i := 0; i < installDockerOpts.Agents; i++ {
+			server, err := node.NewDocker(&types.DockerNodeOptions{
+				ClusterOptions: installDockerOpts,
+				NodeIndex:      i,
+				NodeRole:       types.K3sRoleAgent,
+			})
+			if err != nil {
+				return err
+			}
+			if err := clusterManager.AddNode(server, opts); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func getPackage(path string) (types.Package, error) {

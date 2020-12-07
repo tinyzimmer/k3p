@@ -24,7 +24,7 @@ $(BIN):
 
 PKG_ARGS ?=
 $(PACKAGE): $(BIN)
-	$(BIN) build -o $(PACKAGE) $(PKG_ARGS)
+	$(BIN) build -o $(PACKAGE) --name k3p-test $(PKG_ARGS)
 
 docs:
 	go run hack/docgen.go

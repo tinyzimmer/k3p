@@ -18,13 +18,14 @@ import (
 // Connect will connect to a node over SSH with the given options.
 func Connect(opts *types.NodeConnectOptions) (types.Node, error) {
 	var err error
-	n := &remoteNode{}
+	n := &remoteNode{remoteAddr: opts.Address}
 	n.client, err = getSSHClient(opts)
 	return n, err
 }
 
 type remoteNode struct {
-	client *ssh.Client
+	client     *ssh.Client
+	remoteAddr string
 }
 
 func (n *remoteNode) GetType() types.NodeType { return types.NodeRemote }
@@ -114,6 +115,11 @@ func (n *remoteNode) Execute(opts *types.ExecuteOptions) error {
 	go log.TailReader(opts.LogPrefix, outPipe)
 	go log.TailReader(opts.LogPrefix, errPipe)
 	return sess.Run(cmd)
+}
+
+func (n *remoteNode) GetK3sAddress() (string, error) {
+	// the address is assumed to be the one we connected on (TODO: fix probably)
+	return n.remoteAddr, nil
 }
 
 func (n *remoteNode) Close() error { return n.client.Close() }
