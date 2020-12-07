@@ -6,9 +6,11 @@ import (
 	"github.com/tinyzimmer/k3p/pkg/types"
 )
 
+// const rancherRepo = "rancher/k3s"
+
 // Docker initializes a new node using a local container for the instance.
-func Docker(opts *types.DockerNodeOptions) types.Node {
-	return &docker{}
+func Docker(opts *types.DockerNodeOptions) (types.Node, error) {
+	return &docker{}, nil
 }
 
 type docker struct{}

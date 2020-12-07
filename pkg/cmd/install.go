@@ -31,7 +31,7 @@ func init() {
 	installOpts = &types.InstallOptions{}
 	installConnectOpts = &types.NodeConnectOptions{}
 
-	installCmd.Flags().BoolVarP(&installDocker, "docker", "D", false, "Install the package to a docker container on the local system.")
+	installCmd.Flags().BoolVarP(&installDocker, "docker", "D", false, "Install the package to a docker container on the local system (not yet implemented)")
 	installCmd.Flags().StringVarP(&installOpts.NodeName, "node-name", "n", "", "An optional name to give this node in the cluster")
 	installCmd.Flags().BoolVar(&installOpts.AcceptEULA, "accept-eula", false, "Automatically accept any EULA included with the package")
 	installCmd.Flags().StringVarP(&installOpts.ServerURL, "join", "j", "", "When installing an agent instance, the address of the server to join (e.g. https://myserver:6443)")

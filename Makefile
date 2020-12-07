@@ -115,7 +115,7 @@ ha-join-%:
 # Runs all the different dev flows to make sure nothing serious broke
 # Once I add docker functionality (e.g. deploy a package to local containers), this can be used
 # for integration testing.
-testacc: 
+testacc: lint test
 	$(MAKE) ha-local clean-all-servers 
 	$(MAKE) ha-remote clean-all-servers 
 	$(MAKE) ha-cluster clean-all-servers

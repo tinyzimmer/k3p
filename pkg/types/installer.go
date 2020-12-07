@@ -1,5 +1,10 @@
 package types
 
+import (
+	"fmt"
+	"path"
+)
+
 // Installer is an interface for laying a package manifest down on a system
 // and setting up K3s.
 type Installer interface {
@@ -27,4 +32,48 @@ type InstallOptions struct {
 	InitHA bool
 	// Whether to run as a server or agent
 	K3sRole K3sRole
+}
+
+// ToExecOpts converts these install options into execute options to pass to a
+// node.
+func (opts *InstallOptions) ToExecOpts() *ExecuteOptions {
+	env := map[string]string{
+		"INSTALL_K3S_SKIP_DOWNLOAD": "true",
+	}
+
+	if opts.NodeName != "" {
+		env["K3S_NODE_NAME"] = opts.NodeName
+	}
+
+	if opts.ResolvConf != "" {
+		env["K3S_RESOLV_CONF"] = opts.ResolvConf
+	}
+
+	if opts.KubeconfigMode != "" {
+		env["K3S_KUBECONFIG_MODE"] = opts.KubeconfigMode
+	}
+
+	if opts.NodeToken != "" {
+		env["K3S_TOKEN"] = opts.NodeToken
+	}
+
+	if opts.ServerURL != "" {
+		env["K3S_URL"] = opts.ServerURL
+	}
+
+	if opts.K3sExecArgs != "" {
+		env["INSTALL_K3S_EXEC"] = opts.K3sExecArgs
+	}
+
+	secrets := []string{}
+	if opts.NodeToken != "" {
+		secrets = []string{opts.NodeToken}
+	}
+
+	return &ExecuteOptions{
+		Env:       env,
+		Command:   fmt.Sprintf("sh %q %s", path.Join(K3sScriptsDir, "install.sh"), string(opts.K3sRole)),
+		LogPrefix: "K3S",
+		Secrets:   secrets,
+	}
 }

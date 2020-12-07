@@ -21,8 +21,11 @@ type Manifest struct {
 	Scripts      []string `json:"scripts,omitempty"`
 	Images       []string `json:"images,omitempty"`
 	K8sManifests []string `json:"k8sManifests,omitempty"`
-	EULA         string   `json:"eula,omitempty,omitempty"`
+	EULA         string   `json:"eula,omitempty"`
 }
+
+// HasEULA returns true if the manifest contains an end user license agreement.
+func (m *Manifest) HasEULA() bool { return m.EULA != "" }
 
 // NewEmptyManifest initializes a manifest with empty slices.
 func NewEmptyManifest() Manifest {
