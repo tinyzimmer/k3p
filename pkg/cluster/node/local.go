@@ -18,6 +18,8 @@ func Local() types.Node {
 
 type localNode struct{}
 
+func (l *localNode) GetType() types.NodeType { return types.NodeLocal }
+
 func (l *localNode) MkdirAll(dir string) error {
 	log.Debugf("Ensuring local system directory %q with mode 0755\n", dir)
 	return os.MkdirAll(dir, 0755)

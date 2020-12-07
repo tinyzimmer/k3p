@@ -27,6 +27,8 @@ type remoteNode struct {
 	client *ssh.Client
 }
 
+func (n *remoteNode) GetType() types.NodeType { return types.NodeRemote }
+
 func (n *remoteNode) scpClient() (*scp.Client, error) {
 	scpClient, err := scp.NewClientBySSH(n.client)
 	if err != nil {

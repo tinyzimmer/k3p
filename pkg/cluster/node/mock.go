@@ -26,6 +26,8 @@ func (m *mockNode) rootedDir(f string) string {
 	return path.Join(m.root, strings.TrimPrefix(f, "/"))
 }
 
+func (m *mockNode) GetType() types.NodeType { return types.NodeLocal }
+
 func (m *mockNode) Close() error { return os.RemoveAll(m.root) }
 
 func (m *mockNode) Execute(opts *types.ExecuteOptions) error { return nil }

@@ -25,7 +25,7 @@ type AddNodeOptions struct {
 	RemoteLeader string
 }
 
-// RemoveNodeOptions are options passed to a RemoveNode operation.
+// RemoveNodeOptions are options passed to a RemoveNode operation (not implemented).
 type RemoveNodeOptions struct {
 	*NodeConnectOptions
 	Uninstall bool
@@ -39,6 +39,6 @@ type ClusterManager interface {
 	AddNode(*AddNodeOptions) error
 	// RemoveNode should drain and remove the given node from the k3s cluster.
 	// If NodeConnectOptions are not nil and Uninstall is true, then k3s and
-	// all of its assets should be completely removed from the system.
+	// all of its assets should be completely removed from the system. (not implemented)
 	RemoveNode(*RemoveNodeOptions) error
 }

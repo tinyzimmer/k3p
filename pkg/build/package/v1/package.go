@@ -155,7 +155,7 @@ func (rw *readWriter) Get(artifact *types.Artifact) error {
 		if header.Name != searchName {
 			continue
 		}
-		// We have the right artifact populate the provided object and return
+		// We have the right artifact - populate the provided object and return
 		artifact.Body = ioutil.NopCloser(rdr)
 		artifact.Size = header.Size
 		// this produces a race condition, but should really make sure file is properly closed

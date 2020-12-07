@@ -34,7 +34,7 @@ var mockArtifacts = []*types.Artifact{
 	},
 }
 
-// Mock returns a fake package that can be passed to v1.Load().
+// Mock returns a fake package.
 func Mock() types.Package {
 	tmpDir, err := ioutil.TempDir("", "")
 	if err != nil {
