@@ -22,7 +22,8 @@ The k3p command provides an easy method for packaging a kubernetes environment i
 * [k3p build](k3p_build.md)	 - Build an embedded k3s distribution package
 * [k3p cache](k3p_cache.md)	 - Cache management options
 * [k3p inspect](k3p_inspect.md)	 - Inspect the given package
-* [k3p install](k3p_install.md)	 - Install the given package to the system (requires root)
+* [k3p install](k3p_install.md)	 - Install the given package to the system
 * [k3p node](k3p_node.md)	 - Node management commands
 * [k3p token](k3p_token.md)	 - Token retrieval and generation commands
+* [k3p uninstall](k3p_uninstall.md)	 - Uninstall a k3p package (currently only for docker)
 

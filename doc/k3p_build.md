@@ -9,17 +9,19 @@ k3p build [flags]
 ### Options
 
 ```
-  -a, --arch string        The architecture to package the distribution for. Only (amd64, arm, and arm64 are supported) (default "amd64")
-  -c, --channel string     The release channel to retrieve the version of k3s from (default "stable")
-  -E, --eula string        A file containing an End User License Agreement to display to the user upon installing the package
-  -e, --exclude strings    Directories to exclude when reading the manifest directory
-  -H, --helm-args string   Arguments to pass to the 'helm template' command when searching for images
-  -h, --help               help for build
-  -i, --images string      A file containing a list of extra images to bundle with the archive
-  -m, --manifests string   The directory to scan for kubernetes manifests and charts, defaults to the current directory (default "/home/<user>/devel/k3p")
-  -N, --no-cache           Disable the use of the local cache when downloading assets.
-  -o, --output string      The file to save the distribution package to (default "/home/<user>/devel/k3p/package.tar")
-  -V, --version string     A specific k3s version to bundle with the package, overrides --channel (default "latest")
+  -a, --arch string          The architecture to package the distribution for. Only (amd64, arm, and arm64 are supported) (default "amd64")
+  -c, --channel string       The release channel to retrieve the version of k3s from (default "stable")
+  -E, --eula string          A file containing an End User License Agreement to display to the user upon installing the package
+  -e, --exclude strings      Directories to exclude when reading the manifest directory
+  -H, --helm-args string     Arguments to pass to the 'helm template' command when searching for images
+  -h, --help                 help for build
+  -i, --images string        A file containing a list of extra images to bundle with the archive
+      --k3s-version string   A specific k3s version to bundle with the package, overrides --channel (default "latest")
+  -m, --manifests string     The directory to scan for kubernetes manifests and charts, defaults to the current directory (default "/home/<user>/devel/k3p")
+  -n, --name string          The name to give the package, if not provided one will be generated
+  -N, --no-cache             Disable the use of the local cache when downloading assets.
+  -o, --output string        The file to save the distribution package to (default "/home/<user>/devel/k3p/package.tar")
+  -V, --version string       The version to tag the package (default "latest")
 ```
 
 ### Options inherited from parent commands
