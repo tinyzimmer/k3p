@@ -40,7 +40,7 @@ func Mock() types.Package {
 	if err != nil {
 		panic(err)
 	}
-	writer := &readWriter{workDir: tmpDir, meta: types.NewEmptyMeta()}
+	writer := New(tmpDir)
 	for _, artifact := range mockArtifacts {
 		if err := writer.Put(artifact); err != nil {
 			panic(err)

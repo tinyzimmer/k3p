@@ -73,34 +73,7 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 	}
 
 	log.Info("Parsing kubernetes manifests for container images to download")
-	imageNames, err := parser.ParseImages()
-	if err != nil {
-		return err
-	}
-
-	if opts.ImageFile != "" {
-		log.Infof("Reading container images from %q", opts.ImageFile)
-		body, err := ioutil.ReadFile(opts.ImageFile)
-		if err != nil {
-			return err
-		}
-		for _, img := range strings.Split(string(body), "\n") {
-			if img != "" && !strings.HasPrefix(img, "#") {
-				imageNames = append(imageNames, img)
-			}
-		}
-	}
-
-	log.Info("Detected the following images to bundle with the package:", imageNames)
-	rdr, err := images.NewImageDownloader().PullImages(imageNames, opts.Arch)
-	if err != nil {
-		return err
-	}
-	images, err := util.ArtifactFromReader(types.ArtifactImages, types.ManifestUserImagesFile, rdr)
-	if err != nil {
-		return err
-	}
-	if err := b.writer.Put(images); err != nil {
+	if err := b.bundleImages(opts, parser); err != nil {
 		return err
 	}
 
@@ -144,4 +117,36 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 		return err
 	}
 	return archive.WriteTo(opts.Output)
+}
+
+func (b *builder) bundleImages(opts *types.BuildOptions, parser types.ManifestParser) error {
+	imageNames, err := parser.ParseImages()
+	if err != nil {
+		return err
+	}
+
+	if opts.ImageFile != "" {
+		log.Infof("Reading container images from %q", opts.ImageFile)
+		body, err := ioutil.ReadFile(opts.ImageFile)
+		if err != nil {
+			return err
+		}
+		for _, img := range strings.Split(string(body), "\n") {
+			if img != "" && !strings.HasPrefix(img, "#") {
+				imageNames = append(imageNames, img)
+			}
+		}
+	}
+
+	log.Info("Detected the following images to bundle with the package:", imageNames)
+	rdr, err := images.NewImageDownloader().PullImages(imageNames, opts.Arch)
+	if err != nil {
+		return err
+	}
+	images, err := util.ArtifactFromReader(types.ArtifactImages, types.ManifestUserImagesFile, rdr)
+	if err != nil {
+		return err
+	}
+
+	return b.writer.Put(images)
 }

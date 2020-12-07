@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"os"
 	"path"
-	"runtime"
 	"strings"
 	"time"
 
@@ -111,6 +110,20 @@ func writePkgFileToNode(target types.Node, pkg types.Package, t types.ArtifactTy
 	return target.WriteFile(artifact.Body, path.Join(destDir, artifact.Name), mode, artifact.Size)
 }
 
+type tmpReadCloser struct {
+	tmpDir string
+	f      *os.File
+}
+
+func (r *tmpReadCloser) Read(p []byte) (int, error) { return r.f.Read(p) }
+
+func (r *tmpReadCloser) Close() error {
+	if err := r.f.Close(); err != nil {
+		return err
+	}
+	return os.RemoveAll(r.tmpDir)
+}
+
 // ArtifactFromReader will create a new types.Artifact object with the name and type provided. Its contents
 // are populated by the reader. The purpose of this method is an easy way to determine the size of the
 // object, while taking care that it may be too large to place in memory. The reader is dumped to disk,
@@ -156,16 +169,12 @@ func ArtifactFromReader(t types.ArtifactType, name string, rdr io.ReadCloser) (*
 		return nil, err
 	}
 
-	// Build out the artifact
-	artifact := &types.Artifact{
+	return &types.Artifact{
 		Type: t,
 		Name: name,
 		Size: stat.Size(),
-		Body: f,
-	}
-
-	// Set a finalizer on the artifact to remove the tempdir
-	runtime.SetFinalizer(artifact, func(_ *types.Artifact) { os.RemoveAll(tmpDir) })
-
-	return artifact, nil
+		Body: &tmpReadCloser{
+			tmpDir: tmpDir, f: f,
+		},
+	}, nil
 }

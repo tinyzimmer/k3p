@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/user"
 	"path"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -158,9 +157,7 @@ func (rw *readWriter) Get(artifact *types.Artifact) error {
 		// We have the right artifact - populate the provided object and return
 		artifact.Body = ioutil.NopCloser(rdr)
 		artifact.Size = header.Size
-		// this produces a race condition, but should really make sure file is properly closed
-		// and not rely on waiting for the program to exit
-		// runtime.SetFinalizer(artifact, func(_ *types.Artifact) { f.Close() })
+
 		return nil
 	}
 }
@@ -187,7 +184,6 @@ func (rw *readWriter) Archive() (types.Archive, error) {
 		return nil, err
 	}
 	out := &archive{stat: stat, f: f}
-	runtime.SetFinalizer(out, func(_ *archive) { f.Close() })
 	return out, nil
 }
 
