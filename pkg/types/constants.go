@@ -62,6 +62,8 @@ const (
 	K3sRoleServer K3sRole = "server"
 	// K3sRoleAgent represents a worker node instance
 	K3sRoleAgent K3sRole = "agent"
+	// K3sRoleLoadBalancer is a special role used for running packages in docker containers
+	K3sRoleLoadBalancer K3sRole = "loadbalancer"
 )
 
 // ArtifactType declares a type of artifact to be included in a bundle.

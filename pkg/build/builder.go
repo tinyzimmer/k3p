@@ -55,7 +55,7 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 
 	log.Info("Downloading core k3s components")
 	// need to implement cache layer
-	if err := b.downloadCoreK3sComponents(opts.K3sVersion, opts.Arch); err != nil {
+	if err := b.downloadCoreK3sComponents(opts); err != nil {
 		return err
 	}
 
@@ -72,9 +72,13 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 		}
 	}
 
-	log.Info("Parsing kubernetes manifests for container images to download")
-	if err := b.bundleImages(opts, parser); err != nil {
-		return err
+	if !opts.ExcludeImages {
+		log.Info("Parsing kubernetes manifests for container images to download")
+		if err := b.bundleImages(opts, parser); err != nil {
+			return err
+		}
+	} else {
+		log.Info("Skipping bundling container images with the package")
 	}
 
 	if opts.EULAFile != "" {
@@ -139,7 +143,7 @@ func (b *builder) bundleImages(opts *types.BuildOptions, parser types.ManifestPa
 	}
 
 	log.Info("Detected the following images to bundle with the package:", imageNames)
-	rdr, err := images.NewImageDownloader().PullImages(imageNames, opts.Arch)
+	rdr, err := images.NewImageDownloader().PullImages(imageNames, opts.Arch, opts.PullPolicy)
 	if err != nil {
 		return err
 	}

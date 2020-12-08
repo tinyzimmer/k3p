@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path"
 	"runtime"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -14,7 +16,8 @@ import (
 )
 
 var (
-	buildOpts *types.BuildOptions
+	buildPullPolicy string
+	buildOpts       *types.BuildOptions
 )
 
 func init() {
@@ -36,7 +39,9 @@ func init() {
 	buildCmd.Flags().StringVarP(&buildOpts.ImageFile, "images", "i", "", "A file containing a list of extra images to bundle with the archive")
 	buildCmd.Flags().StringVarP(&buildOpts.EULAFile, "eula", "E", "", "A file containing an End User License Agreement to display to the user upon installing the package")
 	buildCmd.Flags().StringVarP(&buildOpts.Output, "output", "o", path.Join(cwd, "package.tar"), "The file to save the distribution package to")
-	buildCmd.Flags().BoolVarP(&cache.NoCache, "no-cache", "N", false, "Disable the use of the local cache when downloading assets.")
+	buildCmd.Flags().BoolVar(&buildOpts.ExcludeImages, "exclude-images", false, "Don't include container images with the final archive")
+	buildCmd.Flags().StringVar(&buildPullPolicy, "pull-policy", string(types.PullPolicyAlways), "The pull policy to use when bundling container images (valid options always,never,ifnotpresent [case-insensitive])")
+	buildCmd.Flags().BoolVarP(&cache.NoCache, "no-cache", "N", false, "Disable the use of the local cache when downloading assets")
 
 	rootCmd.AddCommand(buildCmd)
 }
@@ -45,6 +50,17 @@ var buildCmd = &cobra.Command{
 	Use:   "build",
 	Short: "Build an embedded k3s distribution package",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// validate pull policy first
+		switch types.PullPolicy(strings.ToLower(buildPullPolicy)) {
+		case types.PullPolicyAlways:
+			buildOpts.PullPolicy = types.PullPolicyAlways
+		case types.PullPolicyNever:
+			buildOpts.PullPolicy = types.PullPolicyNever
+		case types.PullPolicyIfNotPresent:
+			buildOpts.PullPolicy = types.PullPolicyIfNotPresent
+		default:
+			return fmt.Errorf("%s is not a valid pull policy", buildPullPolicy)
+		}
 		builder, err := build.NewBuilder()
 		if err != nil {
 			return err

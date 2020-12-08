@@ -21,9 +21,9 @@ const (
 	k3sChannelsRoot    = "https://update.k3s.io/v1-release/channels"
 )
 
-func (b *builder) downloadCoreK3sComponents(version, arch string) error {
+func (b *builder) downloadCoreK3sComponents(opts *types.BuildOptions) error {
 	log.Info("Fetching checksums...")
-	if err := b.downloadK3sChecksums(version, arch); err != nil {
+	if err := b.downloadK3sChecksums(opts.K3sVersion, opts.Arch); err != nil {
 		return err
 	}
 
@@ -33,17 +33,21 @@ func (b *builder) downloadCoreK3sComponents(version, arch string) error {
 	}
 
 	log.Info("Fetching k3s binary...")
-	if err := b.downloadK3sBinary(version, arch); err != nil {
+	if err := b.downloadK3sBinary(opts.K3sVersion, opts.Arch); err != nil {
 		return err
 	}
 
-	log.Info("Fetching k3s airgap images...")
-	if err := b.downloadK3sAirgapImages(version, arch); err != nil {
-		return err
+	if !opts.ExcludeImages {
+		log.Info("Fetching k3s airgap images...")
+		if err := b.downloadK3sAirgapImages(opts.K3sVersion, opts.Arch); err != nil {
+			return err
+		}
+	} else {
+		log.Info("Skipping bundling k3s airgap images with the package")
 	}
 
 	log.Info("Validating checksums...")
-	if err := b.validateCheckSums(arch); err != nil {
+	if err := b.validateCheckSums(opts); err != nil {
 		return err
 	}
 
@@ -98,7 +102,7 @@ func (b *builder) downloadK3sBinary(version, arch string) error {
 	return b.writer.Put(artifact)
 }
 
-func (b *builder) validateCheckSums(arch string) error {
+func (b *builder) validateCheckSums(opts *types.BuildOptions) error {
 	// Queue up extra check to make sure we visited each
 	var binValid, imagesValid bool
 
@@ -125,7 +129,11 @@ func (b *builder) validateCheckSums(arch string) error {
 
 		// verify the checksums
 		switch fname {
-		case getDownloadAirgapImagesName(arch):
+		case getDownloadAirgapImagesName(opts.Arch):
+			if opts.ExcludeImages {
+				imagesValid = true
+				continue
+			}
 			images := &types.Artifact{
 				Type: types.ArtifactImages,
 				Name: "k3s-airgap-images.tar",
@@ -138,7 +146,7 @@ func (b *builder) validateCheckSums(arch string) error {
 				return err
 			}
 			imagesValid = true
-		case getDownloadK3sBinName(arch):
+		case getDownloadK3sBinName(opts.Arch):
 			k3sbin := &types.Artifact{
 				Type: types.ArtifactBin,
 				Name: "k3s",

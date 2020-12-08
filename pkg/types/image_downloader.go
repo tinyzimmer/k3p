@@ -8,5 +8,5 @@ import "io"
 type ImageDownloader interface {
 	// PullImages should return a reader containing the contents of the exported
 	// images provided as arguments.
-	PullImages(images []string, arch string) (io.ReadCloser, error)
+	PullImages(images []string, arch string, pullPolicy PullPolicy) (io.ReadCloser, error)
 }

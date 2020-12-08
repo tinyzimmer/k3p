@@ -16,46 +16,10 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
-	"github.com/docker/go-connections/nat"
 )
-
-// LoadDockerCluster will load all the nodes associated with a docker cluster. Close only needs
-// to be run on one of the returned nodes, as they all share an underlying client.
-func LoadDockerCluster(name string) ([]*Docker, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return nil, err
-	}
-	containers, err := cli.ContainerList(context.TODO(), dockertypes.ContainerListOptions{
-		Filters: types.DockerClusterFilters(name),
-	})
-	if err != nil {
-		return nil, err
-	}
-	nodes := make([]*Docker, len(containers))
-	for i, container := range containers {
-		nodes[i] = &Docker{
-			cli:         cli,
-			containerID: container.ID,
-			opts:        types.DockerOptionsFromContainer(container),
-		}
-	}
-	return nodes, nil
-}
-
-// DeleteDockerNetwork deletes a docker network with the given name
-func DeleteDockerNetwork(name string) error {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return err
-	}
-	return cli.NetworkRemove(context.TODO(), name)
-}
 
 // NewDocker initializes a new node using a local container for the instance.
 func NewDocker(opts *types.DockerNodeOptions) (types.Node, error) {
@@ -89,6 +53,12 @@ func NewDocker(opts *types.DockerNodeOptions) (types.Node, error) {
 	// Ensure the docker image with the given k3s version is ready for when we start
 	if err := pullIfNotPresent(cli, opts.GetK3sImage()); err != nil {
 		return nil, err
+	}
+
+	// If a load balancer, immediately return a non-initialized container for Execute
+	// to create/start
+	if opts.NodeRole == types.K3sRoleLoadBalancer {
+		return &Docker{cli: cli, opts: opts}, nil
 	}
 
 	// Create a volume for k3s assets
@@ -139,42 +109,6 @@ func NewDocker(opts *types.DockerNodeOptions) (types.Node, error) {
 		containerID: container.ID,
 		opts:        opts,
 	}, nil
-}
-
-func pullIfNotPresent(cli client.APIClient, image string) error {
-	imgs, err := cli.ImageList(context.TODO(), dockertypes.ImageListOptions{
-		Filters: filters.NewArgs(filters.Arg("reference", image)),
-	})
-	if err != nil {
-		return err
-	}
-	if len(imgs) == 1 {
-		log.Debugf("Image %s already exists on the system\n", image)
-		return nil
-	}
-	log.Infof("Pulling image for %s\n", image)
-	rdr, err := cli.ImagePull(context.TODO(), image, dockertypes.ImagePullOptions{})
-	if err != nil {
-		return err
-	}
-	log.DebugReader(rdr)
-	return nil
-}
-
-func ensureClusterNetwork(cli client.APIClient, opts *types.DockerClusterOptions) error {
-	networks, err := cli.NetworkList(context.TODO(), dockertypes.NetworkListOptions{Filters: types.DockerClusterFilters(opts.ClusterName)})
-	if err != nil {
-		return err
-	}
-	if len(networks) > 0 {
-		return nil
-	}
-	log.Info("Creating docker network", opts.ClusterName)
-	_, err = cli.NetworkCreate(context.TODO(), opts.ClusterName, dockertypes.NetworkCreate{
-		Labels:         opts.GetLabels(),
-		CheckDuplicate: true,
-	})
-	return err
 }
 
 // Docker represents a node backed by a docker container. It is exported for the extra
@@ -313,54 +247,23 @@ func (d *Docker) WriteFile(rdr io.ReadCloser, destination string, mode string, s
 // renamed.
 func (d *Docker) Execute(opts *types.ExecuteOptions) error {
 	log.Info("Starting k3s docker node", d.opts.GetNodeName())
-	// Assume being called to start K3s, first remove busybox container
-	if err := d.cli.ContainerRemove(context.TODO(), d.containerID, dockertypes.ContainerRemoveOptions{
-		Force: true,
-	}); err != nil {
-		return err
-	}
-	// Build the k3s container according to the opts
-	hostConfig := &container.HostConfig{
-		Init:  &[]bool{true}[0],
-		Binds: []string{fmt.Sprintf("%s:%s", d.opts.GetNodeName(), types.K3sRootConfigDir)},
-		Tmpfs: map[string]string{
-			"/run":     "",
-			"/var/run": "",
-		},
-		Privileged:    true,
-		SecurityOpt:   []string{"label=disable"},
-		RestartPolicy: container.RestartPolicy{Name: "always"},
-		// NetworkMode: "host",
-	}
-	containerConfig := &container.Config{
-		Hostname: d.opts.GetNodeName(),
-		Image:    d.opts.GetK3sImage(),
-		Env:      buildDockerEnv(opts),
-		Cmd:      buildDockerCmd(opts),
-		Volumes: map[string]struct{}{
-			types.K3sRootConfigDir: struct{}{},
-		},
-		Labels: d.opts.GetComponentLabels("k3s"),
-	}
-	networkConfig := &network.NetworkingConfig{
-		EndpointsConfig: map[string]*network.EndpointSettings{
-			d.opts.ClusterOptions.ClusterName: &network.EndpointSettings{
-				Aliases: []string{d.opts.GetNodeName()},
-			},
-		},
-	}
-	if d.opts.NodeRole == types.K3sRoleServer && d.opts.NodeIndex == 0 {
-		ports := []string{fmt.Sprintf("%d:6443", d.opts.ClusterOptions.APIPort)}
-		exposedPorts, portBindings, err := nat.ParsePortSpecs(ports)
-		if err != nil {
-			log.Errorf("Failed to parse port specs '%v'\n", ports)
+	// Assume being called to start K3s if a server or agent, first remove busybox container
+	if d.opts.NodeRole != types.K3sRoleLoadBalancer {
+		log.Debug("Removing busybox bootstrap node for", d.opts.GetNodeName())
+		if err := d.cli.ContainerRemove(context.TODO(), d.containerID, dockertypes.ContainerRemoveOptions{
+			Force: true,
+		}); err != nil {
 			return err
 		}
-		containerConfig.ExposedPorts = exposedPorts
-		hostConfig.PortBindings = portBindings
+	}
+	// Build the k3s container according to the opts
+	containerConfig, hostConfig, networkConfig, err := translateOptsToConfigs(d.opts, opts)
+	if err != nil {
+		return err
 	}
 	log.Debugf("K3s container config: %+v\n", containerConfig)
 	log.Debugf("K3s host config: %+v\n", hostConfig)
+	log.Debugf("K3s network config: %+v\n", networkConfig)
 	container, err := d.cli.ContainerCreate(context.TODO(), containerConfig, hostConfig, networkConfig, d.opts.GetNodeName())
 	if err != nil {
 		return err

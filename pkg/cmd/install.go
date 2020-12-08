@@ -90,6 +90,7 @@ if not provided you will be prompted for a password`)
 	installCmd.Flags().IntVar(&installDockerOpts.Servers, "servers", 1, "DOCKER ONLY: The number of servers to run in the cluster")
 	installCmd.Flags().IntVar(&installDockerOpts.Agents, "agents", 0, "DOCKER ONLY: The number of agents to run in the cluster")
 	installCmd.Flags().IntVar(&installDockerOpts.APIPort, "api-port", 6443, "DOCKER ONLY: The port to bind to the k3s API server")
+	installCmd.Flags().StringSliceVar(&installDockerOpts.PortMappings, "map-ports", []string{}, "DOCKER ONLY: Additional port mappings to apply to the leader node")
 
 	rootCmd.AddCommand(installCmd)
 }
@@ -165,7 +166,7 @@ See the help below for additional information on available flags.
 			return err
 		}
 
-		// If docker, add any extra nodes
+		// If docker, add any extra nodes and configure the load balancer
 		if installDocker {
 			if err := setupDockerCluster(target); err != nil {
 				return err
@@ -279,6 +280,7 @@ GetKubeconfig:
 
 func setupDockerCluster(leader types.Node) error {
 	clusterManager := cluster.New(leader)
+	// Create additional servers
 	if installDockerOpts.Servers > 1 {
 		opts := &types.AddNodeOptions{
 			NodeRole: types.K3sRoleServer,
@@ -298,6 +300,7 @@ func setupDockerCluster(leader types.Node) error {
 		}
 	}
 
+	// Create any additional agents
 	if installDockerOpts.Agents > 0 {
 		// Wait for the node token to get written to the system
 		log.Info("Waiting for k3s to write the server node-token")
@@ -335,7 +338,16 @@ func setupDockerCluster(leader types.Node) error {
 			}
 		}
 	}
-	return nil
+	// Create an lb
+	lb, err := node.NewDocker(&types.DockerNodeOptions{
+		ClusterOptions: installDockerOpts,
+		NodeRole:       types.K3sRoleLoadBalancer,
+	})
+	if err != nil {
+		return err
+	}
+
+	return lb.Execute(&types.ExecuteOptions{})
 }
 
 func getPackage(path string) (types.Package, error) {

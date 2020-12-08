@@ -5,6 +5,17 @@ type Builder interface {
 	Build(*BuildOptions) error
 }
 
+// PullPolicy represents the pull policy to use when bundling images
+// TODO: This should probably be pulled from corev1.
+type PullPolicy string
+
+// Valid pull policies
+const (
+	PullPolicyAlways       PullPolicy = "always"
+	PullPolicyNever        PullPolicy = "never"
+	PullPolicyIfNotPresent PullPolicy = "ifnotpresent"
+)
+
 // BuildOptions is a struct containing options to pass to the build operation.
 type BuildOptions struct {
 	// The version of the package being built
@@ -27,6 +38,10 @@ type BuildOptions struct {
 	HelmArgs string
 	// A list of directories to exclude while searching for manifests
 	Excludes []string
+	// Don't bundle docker images with the archive
+	ExcludeImages bool
+	// The pull policy to use
+	PullPolicy PullPolicy
 	// The path to write the final archive to
 	Output string
 }

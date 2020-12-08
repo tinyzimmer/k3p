@@ -30,6 +30,7 @@ var uninstallCmd = &cobra.Command{
 		}
 		if len(nodes) == 0 {
 			log.Info("No running clusters found for", uninstallName)
+			return nil
 		}
 		for _, node := range nodes {
 			defer node.Close()

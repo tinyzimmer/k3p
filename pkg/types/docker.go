@@ -33,6 +33,8 @@ type DockerClusterOptions struct {
 	Servers, Agents int
 	// The port on the host to bind the API to
 	APIPort int
+	// Additional port mappings to apply to the leader node
+	PortMappings []string
 }
 
 // DockerClusterFilters returns the filters for matching all components of a given cluster.
@@ -68,6 +70,9 @@ func (d *DockerClusterOptions) GetLabels() map[string]string {
 
 // GetK3sImage returns the K3s image for these options
 func (d *DockerNodeOptions) GetK3sImage() string {
+	if d.NodeRole == K3sRoleLoadBalancer {
+		return "rancher/k3d-proxy:latest"
+	}
 	return fmt.Sprintf("%s:%s", rancherRepo, strings.Replace(d.ClusterOptions.K3sVersion, "+", "-", -1))
 }
 
@@ -76,6 +81,9 @@ func (d *DockerNodeOptions) GetNodeName() string {
 	nodeRole := K3sRoleServer
 	if d.NodeRole != "" {
 		nodeRole = d.NodeRole
+	}
+	if nodeRole == K3sRoleLoadBalancer {
+		return fmt.Sprintf("%s-serverlb", strings.Replace(d.ClusterOptions.ClusterName, "_", "-", -1))
 	}
 	return fmt.Sprintf(
 		"%s-%s-%s",
@@ -100,7 +108,7 @@ func (d *DockerNodeOptions) GetLabels() map[string]string {
 // GetComponentLabels returns the labels for a specific component represented by these options.
 func (d *DockerNodeOptions) GetComponentLabels(component string) map[string]string {
 	labels := d.GetLabels()
-	labels["app"] = component
+	labels["component"] = component
 	return labels
 }
 
