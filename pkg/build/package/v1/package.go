@@ -28,6 +28,8 @@ const (
 	scriptsDir = "scripts"
 	// manifestDir is the directory for storing manifests inside a package
 	manifestDir = "manifests"
+	// staticDir is the directory where static assets are stored inside the package
+	staticDir = "static"
 	// the tar file we use inside the workdir
 	tarFile = "package.tar"
 )
@@ -125,7 +127,9 @@ func (rw *readWriter) PutMeta(meta *types.PackageMeta) error {
 	return json.Unmarshal(out, rw.meta)
 }
 
-func (rw *readWriter) GetMeta() *types.PackageMeta { return rw.meta }
+func (rw *readWriter) GetMeta() *types.PackageMeta {
+	return rw.sanitizeMeta()
+}
 
 func (rw *readWriter) Get(artifact *types.Artifact) error {
 	searchName := artifact.Name
@@ -191,6 +195,27 @@ func (rw *readWriter) Close() error {
 	return os.RemoveAll(rw.workDir)
 }
 
+func (rw *readWriter) sanitizeMeta() *types.PackageMeta {
+	outMeta := rw.meta.DeepCopy()
+	outMeta.Manifest = types.NewEmptyManifest()
+	for _, bin := range rw.meta.Manifest.Bins {
+		outMeta.Manifest.Bins = append(outMeta.Manifest.Bins, strings.TrimPrefix(bin, binDir+"/"))
+	}
+	for _, img := range rw.meta.Manifest.Images {
+		outMeta.Manifest.Images = append(outMeta.Manifest.Images, strings.TrimPrefix(img, imageDir+"/"))
+	}
+	for _, script := range rw.meta.Manifest.Scripts {
+		outMeta.Manifest.Scripts = append(outMeta.Manifest.Scripts, strings.TrimPrefix(script, scriptsDir+"/"))
+	}
+	for _, mani := range rw.meta.Manifest.K8sManifests {
+		outMeta.Manifest.K8sManifests = append(outMeta.Manifest.K8sManifests, strings.TrimPrefix(mani, manifestDir+"/"))
+	}
+	for _, static := range rw.meta.Manifest.Static {
+		outMeta.Manifest.Static = append(outMeta.Manifest.Static, strings.TrimPrefix(static, staticDir+"/"))
+	}
+	return outMeta
+}
+
 func (rw *readWriter) appendMeta(t types.ArtifactType, tarPath string) {
 	switch t {
 	case types.ArtifactBin:
@@ -201,6 +226,8 @@ func (rw *readWriter) appendMeta(t types.ArtifactType, tarPath string) {
 		rw.meta.Manifest.Scripts = append(rw.meta.Manifest.Scripts, tarPath)
 	case types.ArtifactManifest:
 		rw.meta.Manifest.K8sManifests = append(rw.meta.Manifest.K8sManifests, tarPath)
+	case types.ArtifactStatic:
+		rw.meta.Manifest.Static = append(rw.meta.Manifest.Static, tarPath)
 	case types.ArtifactEULA:
 		rw.meta.Manifest.EULA = tarPath
 	}
@@ -216,6 +243,8 @@ func (rw *readWriter) hasDirPrefix(artifact *types.Artifact) bool {
 		return strings.HasPrefix(artifact.Name, scriptsDir)
 	case types.ArtifactManifest:
 		return strings.HasPrefix(artifact.Name, manifestDir)
+	case types.ArtifactStatic:
+		return strings.HasPrefix(artifact.Name, staticDir)
 	}
 	return false
 }
@@ -230,6 +259,8 @@ func dirFromType(t types.ArtifactType) string {
 		return scriptsDir
 	case types.ArtifactManifest:
 		return manifestDir
+	case types.ArtifactStatic:
+		return staticDir
 	}
 	return ""
 }

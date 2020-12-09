@@ -25,13 +25,19 @@ const AgentTokenFile = "/var/lib/rancher/k3s/server/node-token"
 
 // InstalledPackageFile is the file where the original tarball is copied
 // during the installation.
-const InstalledPackageFile = "/var/lib/rancher/k3s/data/package.tar"
+const InstalledPackageFile = "/var/lib/rancher/k3s/data/k3p-package.tar"
+
+// InstalledConfigFile is the file where the variables used at installation are stored.
+const InstalledConfigFile = "/var/lib/rancher/k3s/data/k3p-config.json"
 
 // K3sManifestsDir is the directory where manifests are installed for k3s to pre-load on boot.
 const K3sManifestsDir = "/var/lib/rancher/k3s/server/manifests"
 
 // K3sImagesDir is the directory where images are pre-loaded on a server or agent.
 const K3sImagesDir = "/var/lib/rancher/k3s/agent/images"
+
+// K3sStaticDir is the directory where static content can be served from the k8s api.
+const K3sStaticDir = "/var/lib/rancher/k3s/server/static/k3p"
 
 // K3sScriptsDir is the directory where scripts are installed to the system.
 const K3sScriptsDir = "/usr/local/bin/k3p-scripts"
@@ -78,6 +84,8 @@ const (
 	ArtifactScript ArtifactType = "script"
 	// ArtifactManifest represents a kubernetes manifest artifact.
 	ArtifactManifest ArtifactType = "manifest"
+	// ArtifactStatic represents static content to be hosted by the api server
+	ArtifactStatic ArtifactType = "static"
 	// ArtifactEULA represents an End User License Agreement.
 	ArtifactEULA ArtifactType = "eula"
 )

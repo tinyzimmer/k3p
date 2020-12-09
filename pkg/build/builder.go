@@ -109,13 +109,22 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 		K3sVersion:  opts.K3sVersion,
 		Arch:        opts.Arch,
 	}
+	if opts.ConfigFile != "" {
+		log.Debugf("Reading configuration file at %q\n", opts.ConfigFile)
+		conf, err := types.PackageConfigFromFile(opts.ConfigFile)
+		if err != nil {
+			return err
+		}
+		packageMeta.PackageConfig = conf
+		log.Debugf("Unmarshaled config: %+v\n", *packageMeta.PackageConfig)
+	}
 	log.Debugf("Appending meta: %+v\n", packageMeta)
 	if err := b.writer.PutMeta(&packageMeta); err != nil {
 		return err
 	}
 	log.Debugf("Complete package meta: %+v\n", b.writer.GetMeta())
 
-	log.Infof("Archiving version %q of bundle to %q\n", opts.BuildVersion, opts.Output)
+	log.Infof("Archiving version %q of %q to %q\n", opts.BuildVersion, opts.Name, opts.Output)
 	archive, err := b.writer.Archive()
 	if err != nil {
 		return err
@@ -130,7 +139,7 @@ func (b *builder) bundleImages(opts *types.BuildOptions, parser types.ManifestPa
 	}
 
 	if opts.ImageFile != "" {
-		log.Infof("Reading container images from %q", opts.ImageFile)
+		log.Infof("Reading container images from %q\n", opts.ImageFile)
 		body, err := ioutil.ReadFile(opts.ImageFile)
 		if err != nil {
 			return err
@@ -142,11 +151,17 @@ func (b *builder) bundleImages(opts *types.BuildOptions, parser types.ManifestPa
 		}
 	}
 
+	if len(opts.Images) > 0 {
+		log.Infof("Got the following images on the command line: %+v\n", opts.Images)
+		imageNames = append(imageNames, opts.Images...)
+	}
+
 	log.Info("Detected the following images to bundle with the package:", imageNames)
 	rdr, err := images.NewImageDownloader().PullImages(imageNames, opts.Arch, opts.PullPolicy)
 	if err != nil {
 		return err
 	}
+	log.Info("Adding container images to package")
 	images, err := util.ArtifactFromReader(types.ArtifactImages, types.ManifestUserImagesFile, rdr)
 	if err != nil {
 		return err

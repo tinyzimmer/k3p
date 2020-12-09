@@ -51,7 +51,7 @@ func (i *installer) Install(target types.Node, pkg types.Package, opts *types.In
 	}
 
 	// unpack the manifest onto the node
-	if err := util.SyncPackageToNode(target, pkg); err != nil {
+	if err := util.SyncPackageToNode(target, pkg, opts.Variables); err != nil {
 		return err
 	}
 

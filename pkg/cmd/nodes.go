@@ -69,7 +69,7 @@ var nodesAddCmd = &cobra.Command{
 		case types.K3sRoleAgent:
 			nodeAddOpts.NodeRole = types.K3sRoleAgent
 		default:
-			return fmt.Errorf("%q is not a valid node role", nodeRole)
+			return fmt.Errorf("%q is not a valid node role", nodeAddRole)
 		}
 
 		if nodeAddOpts.SSHKeyFile == "" {

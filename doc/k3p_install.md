@@ -32,6 +32,7 @@ k3p install PACKAGE [flags]
 ### Options
 
 ```
+      --accept-defaults           Accept the defaults for any package configurations, default behavior is to prompt for all unprovided values
       --accept-eula               Automatically accept any EULA included with the package
       --agents int                DOCKER ONLY: The number of agents to run in the cluster
       --api-port int              DOCKER ONLY: The port to bind to the k3s API server (default 6443)
@@ -64,8 +65,10 @@ k3p install PACKAGE [flags]
       --resolv-conf string        The path of a resolv-conf file to use when configuring DNS in the cluster.
                                   When used with the --host flag, the path must reside on the remote system (this will change in the future).
       --servers int               DOCKER ONLY: The number of servers to run in the cluster (default 1)
+      --set stringArray           Values to set to configurations in the package in the format of --set <name>=<value>
   -p, --ssh-port int              The port to use when connecting to the remote host over SSH (default 22)
   -u, --ssh-user string           The username to use when authenticating against the remote host (default "<user>")
+  -f, --values string             An optional json or yaml file containing key-value pairs of package configurations
       --write-kubeconfig string   Write a copy of the admin client to this file
 ```
 

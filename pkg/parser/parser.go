@@ -46,6 +46,7 @@ func (p *ManifestParser) ParseImages() ([]string, error) {
 				log.Info("Skipping excluded directory", file)
 				return filepath.SkipDir
 			}
+			// Check if it's a helm chart
 			if isHelmChart(file) {
 				log.Info("Detected helm chart at", file)
 				containerImages, err := p.detectImagesFromHelmChart(file)
@@ -56,6 +57,19 @@ func (p *ManifestParser) ParseImages() ([]string, error) {
 					images = appendIfMissing(images, containerImages...)
 				}
 				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Check if we have a packaged helm chart
+		if strings.HasSuffix(info.Name(), ".tgz") && isHelmArchive(file) {
+			log.Info("Detected helm chart at", file)
+			containerImages, err := p.detectImagesFromHelmChart(file)
+			if err != nil {
+				return err
+			}
+			if len(containerImages) > 0 {
+				images = appendIfMissing(images, containerImages...)
 			}
 			return nil
 		}
@@ -107,13 +121,24 @@ func (p *ManifestParser) ParseManifests() ([]*types.Artifact, error) {
 			}
 			if isHelmChart(file) {
 				log.Infof("Packaging helm chart: %q\n", file)
-				artifact, err := p.packageHelmChartToManifest(file)
+				helmArtifacts, err := p.packageHelmChartToArtifacts(file)
 				if err != nil {
 					return err
 				}
-				artifacts = append(artifacts, artifact)
+				artifacts = append(artifacts, helmArtifacts...)
 				return filepath.SkipDir
 			}
+			return nil
+		}
+
+		// Check if we have an already packaged helm chart
+		if strings.HasSuffix(info.Name(), ".tgz") && isHelmArchive(file) {
+			log.Info("Detected helm chart at", file)
+			helmArtifacts, err := p.packageHelmChartToArtifacts(file)
+			if err != nil {
+				return err
+			}
+			artifacts = append(artifacts, helmArtifacts...)
 			return nil
 		}
 

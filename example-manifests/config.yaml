@@ -1,0 +1,4 @@
+variables:
+  - name: DNS_NAME
+    default: "whoami.local"
+

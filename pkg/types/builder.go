@@ -30,8 +30,12 @@ type BuildOptions struct {
 	Arch string
 	// An optional EULA to provide with the package
 	EULAFile string
+	// An optional config file providing variables to be used at installation
+	ConfigFile string
 	// A path to an optional file of newline delimited container images to include in the package
 	ImageFile string
+	// A list of images to include in the package
+	Images []string
 	// The directory to scan for kubernetes manifests and helm charts
 	ManifestDir string
 	// Arguments to pass to helm charts bundled with the application

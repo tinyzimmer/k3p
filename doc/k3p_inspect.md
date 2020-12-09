@@ -9,7 +9,9 @@ k3p inspect PACKAGE [flags]
 ### Options
 
 ```
-  -h, --help   help for inspect
+  -D, --details           Show additional details on package content
+  -h, --help              help for inspect
+  -m, --manifest string   Dump the contents of the specified manifest
 ```
 
 ### Options inherited from parent commands

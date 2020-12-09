@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -15,6 +17,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
+	"gopkg.in/yaml.v2"
 
 	v1 "github.com/tinyzimmer/k3p/pkg/build/package/v1"
 	"github.com/tinyzimmer/k3p/pkg/cluster"
@@ -25,23 +28,27 @@ import (
 )
 
 var (
-	nodeRole               string
+	installNodeRole        string
 	installDocker          bool
 	installWriteKubeconfig string
-	installOpts            *types.InstallOptions
-	installConnectOpts     *types.NodeConnectOptions
-	installDockerOpts      *types.DockerClusterOptions
+	installValuesFile      string
+	installValues          []string
+	installAcceptDefaults  bool
+	installOpts            types.InstallOptions
+	installConnectOpts     types.NodeConnectOptions
+	installDockerOpts      types.DockerClusterOptions
 )
 
 func init() {
-	installOpts = &types.InstallOptions{}
-	installConnectOpts = &types.NodeConnectOptions{}
-	installDockerOpts = &types.DockerClusterOptions{}
+
+	installCmd.Flags().StringVarP(&installValuesFile, "values", "f", "", "An optional json or yaml file containing key-value pairs of package configurations")
+	installCmd.Flags().StringArrayVar(&installValues, "set", []string{}, "Values to set to configurations in the package in the format of --set <name>=<value>")
+	installCmd.Flags().BoolVar(&installAcceptDefaults, "accept-defaults", false, "Accept the defaults for any package configurations, default behavior is to prompt for all unprovided values")
 
 	installCmd.Flags().StringVarP(&installOpts.NodeName, "node-name", "n", "", "An optional name to give this node in the cluster")
 	installCmd.Flags().BoolVar(&installOpts.AcceptEULA, "accept-eula", false, "Automatically accept any EULA included with the package")
 	installCmd.Flags().StringVarP(&installOpts.ServerURL, "join", "j", "", "When installing an agent instance, the address of the server to join (e.g. https://myserver:6443)")
-	installCmd.Flags().StringVarP(&nodeRole, "join-role", "r", "agent", `Specify whether to join the cluster as a "server" or "agent"`)
+	installCmd.Flags().StringVarP(&installNodeRole, "join-role", "r", "agent", `Specify whether to join the cluster as a "server" or "agent"`)
 	installCmd.Flags().StringVarP(&installOpts.NodeToken, "join-token", "t", "", `When installing an additional agent or server instance, the node token to use.
 
 For new agents, this can be retrieved with "k3p token get agent" or in 
@@ -120,29 +127,31 @@ See the help below for additional information on available flags.
 `,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// check the node role to make sure it's valid if relevant
+		if installOpts.ServerURL != "" && installNodeRole != "" {
+			switch types.K3sRole(installNodeRole) {
+			case types.K3sRoleServer:
+				installOpts.K3sRole = types.K3sRoleServer
+			case types.K3sRoleAgent:
+				installOpts.K3sRole = types.K3sRoleAgent
+			default:
+				return fmt.Errorf("%q is not a valid node role", installNodeRole)
+			}
+		}
+
 		// Retrieve the package from the command line
 		pkg, err := getPackage(args[0])
 		if err != nil {
 			return err
 		}
 
-		// check the node role to make sure it's valid if relevant
-		if installOpts.ServerURL != "" && nodeRole != "" {
-			switch types.K3sRole(nodeRole) {
-			case types.K3sRoleServer:
-				installOpts.K3sRole = types.K3sRoleServer
-			case types.K3sRoleAgent:
-				installOpts.K3sRole = types.K3sRoleAgent
-			default:
-				return fmt.Errorf("%q is not a valid node role", nodeRole)
-			}
-		}
+		pkgMeta := pkg.GetMeta()
 
 		// Do validations on any docker options
 		if installDocker {
-			installDockerOpts.K3sVersion = pkg.GetMeta().GetK3sVersion()
+			installDockerOpts.K3sVersion = pkgMeta.GetK3sVersion()
 			if installDockerOpts.ClusterName == "" {
-				installDockerOpts.ClusterName = pkg.GetMeta().GetName()
+				installDockerOpts.ClusterName = pkgMeta.GetName()
 			}
 			if installDockerOpts.Servers&1 != 1 {
 				return errors.New("Docker node servers must be an odd number")
@@ -160,8 +169,16 @@ See the help below for additional information on available flags.
 
 		defer target.Close()
 
+		// Check if we are performing any variable substitution
+		if config := pkgMeta.GetPackageConfig(); config != nil {
+			installOpts.Variables, err = gatherConfigVariables(config)
+			if err != nil {
+				return err
+			}
+		}
+
 		// run the installation
-		err = install.New().Install(target, pkg, installOpts)
+		err = install.New().Install(target, pkg, &installOpts)
 		if err != nil {
 			return err
 		}
@@ -202,6 +219,57 @@ func logCompletion(target types.Node) {
 	}
 }
 
+func gatherConfigVariables(cfg *types.PackageConfig) (map[string]string, error) {
+	vars := make(map[string]string)
+	if installValuesFile != "" {
+		body, err := ioutil.ReadFile(installValuesFile)
+		if err != nil {
+			return nil, err
+		}
+		if strings.HasSuffix(installValuesFile, ".json") {
+			err = json.Unmarshal(body, &vars)
+		} else if strings.HasSuffix(installValuesFile, ".yaml") || strings.HasSuffix(installValuesFile, ".yml") {
+			err = yaml.Unmarshal(body, &vars)
+		} else {
+			err = fmt.Errorf("Not a valid json or yaml file: %q", installValuesFile)
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	for _, val := range installValues {
+		spl := strings.Split(val, "=")
+		if len(spl) != 2 {
+			return nil, fmt.Errorf("Invalid argument to --set %q", val)
+		}
+		vars[spl[0]] = spl[1]
+	}
+	for _, vari := range cfg.Variables {
+		if _, ok := vars[vari.Name]; !ok {
+			if vari.Default != "" && installAcceptDefaults {
+				vars[vari.Name] = vari.Default
+				continue
+			}
+			var prompt string
+			if vari.Prompt != "" {
+				prompt = vari.Prompt + ": "
+			} else {
+				prompt = fmt.Sprintf("Please provide a value for %s: ", vari.Name)
+			}
+			scanner := bufio.NewScanner(os.Stdin)
+			for {
+				fmt.Printf(prompt)
+				scanner.Scan()
+				if res := scanner.Text(); res != "" {
+					vars[vari.Name] = res
+					break
+				}
+			}
+		}
+	}
+	return vars, nil
+}
+
 func getTargetNode(pkg types.Package) (types.Node, error) {
 	if installConnectOpts.Address != "" {
 		if installConnectOpts.SSHKeyFile == "" {
@@ -212,11 +280,11 @@ func getTargetNode(pkg types.Package) (types.Node, error) {
 			}
 			installConnectOpts.SSHPassword = string(bytePassword)
 		}
-		return node.Connect(installConnectOpts)
+		return node.Connect(&installConnectOpts)
 	}
 	if installDocker {
 		target, err := node.NewDocker(&types.DockerNodeOptions{
-			ClusterOptions: installDockerOpts,
+			ClusterOptions: &installDockerOpts,
 			NodeIndex:      0,
 			NodeRole:       types.K3sRoleServer,
 		})
@@ -287,7 +355,7 @@ func setupDockerCluster(leader types.Node) error {
 		}
 		for i := 1; i < installDockerOpts.Servers; i++ {
 			server, err := node.NewDocker(&types.DockerNodeOptions{
-				ClusterOptions: installDockerOpts,
+				ClusterOptions: &installDockerOpts,
 				NodeIndex:      i,
 				NodeRole:       types.K3sRoleServer,
 			})
@@ -326,7 +394,7 @@ func setupDockerCluster(leader types.Node) error {
 		}
 		for i := 0; i < installDockerOpts.Agents; i++ {
 			server, err := node.NewDocker(&types.DockerNodeOptions{
-				ClusterOptions: installDockerOpts,
+				ClusterOptions: &installDockerOpts,
 				NodeIndex:      i,
 				NodeRole:       types.K3sRoleAgent,
 			})
@@ -340,7 +408,7 @@ func setupDockerCluster(leader types.Node) error {
 	}
 	// Create an lb
 	lb, err := node.NewDocker(&types.DockerNodeOptions{
-		ClusterOptions: installDockerOpts,
+		ClusterOptions: &installDockerOpts,
 		NodeRole:       types.K3sRoleLoadBalancer,
 	})
 	if err != nil {

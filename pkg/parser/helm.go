@@ -2,7 +2,6 @@ package parser
 
 import (
 	"bytes"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -27,7 +26,7 @@ metadata:
   namespace: kube-system
 spec:
   targetNamespace: default 
-  chartContent: {{ .ChartContent }}
+  chart: https://%{KUBERNETES_API}%/static/k3p/{{ .Filename }}
 {{- if .ValuesContent }}
   valuesContent: |-
     {{ .ValuesContent | nindent 4 }}
@@ -39,6 +38,11 @@ func isHelmChart(dir string) bool {
 	return err == nil && !info.IsDir()
 }
 
+func isHelmArchive(file string) bool {
+	log.Debug("Executing command: helm inspect chart", file)
+	return exec.Command("helm", "inspect", "chart", file).Run() == nil
+}
+
 func (p *ManifestParser) detectImagesFromHelmChart(chartPath string) ([]string, error) {
 	images := make([]string, 0)
 
@@ -47,7 +51,7 @@ func (p *ManifestParser) detectImagesFromHelmChart(chartPath string) ([]string, 
 		args = append(args, strings.Fields(helmArgs)...)
 	}
 
-	log.Debugf("Executing command: helm %s", strings.Join(args, " "))
+	log.Debugf("Executing command: helm %s\n", strings.Join(args, " "))
 	out, err := exec.Command("helm", args...).Output()
 	if err != nil {
 		return nil, err
@@ -63,7 +67,7 @@ func (p *ManifestParser) detectImagesFromHelmChart(chartPath string) ([]string, 
 		// Decode the object
 		obj, err := p.Decode([]byte(raw))
 		if err != nil {
-			log.Debugf("Skipping invalid kubernetes object in rendered helm template: %s", err.Error())
+			log.Debugf("Skipping invalid kubernetes object in rendered helm template: %s\n", err.Error())
 			continue
 		}
 		// Append any images to the local images to be downloaded
@@ -75,7 +79,7 @@ func (p *ManifestParser) detectImagesFromHelmChart(chartPath string) ([]string, 
 	return images, nil
 }
 
-func (p *ManifestParser) packageHelmChartToManifest(chartPath string) (*types.Artifact, error) {
+func (p *ManifestParser) packageHelmChartToArtifacts(chartPath string) ([]*types.Artifact, error) {
 
 	// only support values files for now, need to find a better way to do this
 	valuesFiles := make([]string, 0)
@@ -108,42 +112,64 @@ func (p *ManifestParser) packageHelmChartToManifest(chartPath string) (*types.Ar
 	}
 
 	// package the chart to a temp file
-	tmpDir, err := util.GetTempDir()
-	if err != nil {
-		return nil, err
+	var packagedChartBytes []byte
+	var packagedChartName string
+	var err error
+	if isHelmChart(chartPath) {
+		// Chart is a directory that needs to be packaged
+		tmpDir, err := util.GetTempDir()
+		if err != nil {
+			return nil, err
+		}
+		defer os.RemoveAll(tmpDir)
+		log.Debugf("Executing command: helm package %s -d %s\n", chartPath, tmpDir)
+		_, err = exec.Command("helm", "package", chartPath, "-d", tmpDir).Output()
+		if err != nil {
+			return nil, err
+		}
+		files, err := ioutil.ReadDir(tmpDir)
+		if err != nil {
+			return nil, err
+		}
+		if len(files) != 1 {
+			return nil, errors.New("helm package command produced more or less than 1 one artifact")
+		}
+		chartPkg := path.Join(tmpDir, files[0].Name())
+		packagedChartName = path.Base(files[0].Name())
+		packagedChartBytes, err = ioutil.ReadFile(chartPkg)
+	} else {
+		// Chart is already packaged
+		log.Debugf("Chart at %q is already packaged, adding directly to manifest\n", chartPath)
+		packagedChartName = path.Base(chartPath)
+		packagedChartBytes, err = ioutil.ReadFile(chartPath)
 	}
-	defer os.RemoveAll(tmpDir)
-	log.Debugf("Executing command: helm package %s -d %s", chartPath, tmpDir)
-	_, err = exec.Command("helm", "package", chartPath, "-d", tmpDir).Output()
-	if err != nil {
-		return nil, err
-	}
-	files, err := ioutil.ReadDir(tmpDir)
-	if err != nil {
-		return nil, err
-	}
-	if len(files) != 1 {
-		return nil, errors.New("helm package command produced more or less than 1 one artifact")
-	}
-	chartPkg := path.Join(tmpDir, files[0].Name())
-	packagedChart, err := ioutil.ReadFile(chartPkg)
 	if err != nil {
 		return nil, err
 	}
 
+	stripExt := strings.TrimSuffix(path.Base(chartPath), ".tgz")
+
 	var out bytes.Buffer
 	if err := helmCRTmpl.Execute(&out, map[string]string{
-		"Name":          path.Base(chartPath),
-		"ChartContent":  base64.StdEncoding.EncodeToString(packagedChart),
+		"Name":          strings.Replace(stripExt, ".", "-", -1),
+		"Filename":      packagedChartName,
 		"ValuesContent": valuesContent,
 	}); err != nil {
 		return nil, err
 	}
 	outBytes := out.Bytes()
-	return &types.Artifact{
-		Type: types.ArtifactManifest,
-		Name: fmt.Sprintf("%s-helm-chart.yaml", path.Base(chartPath)),
-		Body: ioutil.NopCloser(bytes.NewReader(outBytes)),
-		Size: int64(len(outBytes)),
+	return []*types.Artifact{
+		{
+			Type: types.ArtifactManifest,
+			Name: fmt.Sprintf("%s-helm-chart.yaml", stripExt),
+			Body: ioutil.NopCloser(bytes.NewReader(outBytes)),
+			Size: int64(len(outBytes)),
+		},
+		{
+			Type: types.ArtifactStatic,
+			Name: packagedChartName,
+			Body: ioutil.NopCloser(bytes.NewReader(packagedChartBytes)),
+			Size: int64(len(packagedChartBytes)),
+		},
 	}, nil
 }

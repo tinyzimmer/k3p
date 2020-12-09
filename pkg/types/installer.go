@@ -32,6 +32,9 @@ type InstallOptions struct {
 	InitHA bool
 	// Whether to run as a server or agent
 	K3sRole K3sRole
+	// Variables contain substitutions to perform on manifests before
+	// installing them to the system.
+	Variables map[string]string
 }
 
 // ToExecOpts converts these install options into execute options to pass to a

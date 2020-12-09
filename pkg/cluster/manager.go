@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -66,7 +67,23 @@ func (m *manager) AddNode(newNode types.Node, opts *types.AddNodeOptions) error 
 	}
 	tokenStr := strings.TrimSpace(string(token))
 
-	if err := util.SyncPackageToNode(newNode, pkg); err != nil {
+	var vars map[string]string
+	if cfg := pkg.GetMeta().GetPackageConfig(); cfg != nil {
+		f, err := m.leader.GetFile(types.InstalledConfigFile)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		body, err := ioutil.ReadAll(f)
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(body, &vars); err != nil {
+			return err
+		}
+	}
+
+	if err := util.SyncPackageToNode(newNode, pkg, vars); err != nil {
 		return err
 	}
 

@@ -1,7 +1,9 @@
 package util
 
 import (
+	"bytes"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -65,48 +67,79 @@ func GenerateToken(length int) string {
 
 // SyncPackageToNode is a convenience method for extracting the contents of a package manifest
 // to a k3s node.
-func SyncPackageToNode(target types.Node, pkg types.Package) error {
+func SyncPackageToNode(target types.Node, pkg types.Package, vars map[string]string) error {
 	meta := pkg.GetMeta()
 
-	log.Info("Installing binaries to machine at", types.K3sBinDir)
-	for _, bin := range meta.Manifest.Bins {
-		if err := writePkgFileToNode(target, pkg, types.ArtifactBin, path.Base(bin), types.K3sBinDir, "0755"); err != nil {
+	if len(meta.Manifest.Bins) > 0 {
+		log.Info("Installing binaries to", types.K3sBinDir)
+		for _, bin := range meta.Manifest.Bins {
+			if err := writePkgFileToNode(target, pkg, types.ArtifactBin, path.Base(bin), types.K3sBinDir, "0755", vars); err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(meta.Manifest.Scripts) > 0 {
+		log.Info("Installing scripts to", types.K3sScriptsDir)
+		for _, script := range meta.Manifest.Scripts {
+			if err := writePkgFileToNode(target, pkg, types.ArtifactScript, path.Base(script), types.K3sBinDir, "0755", vars); err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(meta.Manifest.Images) > 0 {
+		log.Info("Installing images to", types.K3sImagesDir)
+		for _, imgs := range meta.Manifest.Images {
+			if err := writePkgFileToNode(target, pkg, types.ArtifactImages, path.Base(imgs), types.K3sImagesDir, "0644", vars); err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(meta.Manifest.K8sManifests) > 0 {
+		log.Info("Installing manifests to", types.K3sManifestsDir)
+		for _, mani := range meta.Manifest.K8sManifests {
+			if err := writePkgFileToNode(target, pkg, types.ArtifactManifest, mani, types.K3sManifestsDir, "0644", vars); err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(meta.Manifest.Static) > 0 {
+		log.Info("Installing static content to", types.K3sStaticDir)
+		for _, static := range meta.Manifest.Static {
+			static = strings.TrimPrefix(static, "static/") // ugly hack, should fix to come back without the prefix
+			if err := writePkgFileToNode(target, pkg, types.ArtifactStatic, static, types.K3sStaticDir, "0644", vars); err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(vars) > 0 {
+		out, err := json.MarshalIndent(vars, "", "  ")
+		if err != nil {
+			return err
+		}
+		rdr := ioutil.NopCloser(bytes.NewReader(out))
+		if err := target.WriteFile(rdr, types.InstalledConfigFile, "0644", int64(len(out))); err != nil {
 			return err
 		}
 	}
 
-	log.Info("Installing scripts to machine at", types.K3sScriptsDir)
-	for _, script := range meta.Manifest.Scripts {
-		if err := writePkgFileToNode(target, pkg, types.ArtifactScript, path.Base(script), types.K3sBinDir, "0755"); err != nil {
-			return err
-		}
-	}
-
-	log.Info("Installing images to machine at", types.K3sImagesDir)
-	for _, imgs := range meta.Manifest.Images {
-		if err := writePkgFileToNode(target, pkg, types.ArtifactImages, path.Base(imgs), types.K3sImagesDir, "0644"); err != nil {
-			return err
-		}
-	}
-
-	log.Info("Installing manifests to machine at", types.K3sManifestsDir)
-	for _, mani := range meta.Manifest.K8sManifests {
-		// strip the prefix if it matches the base of the k3s dir
-		mani = strings.TrimPrefix(mani, path.Base(types.K3sManifestsDir)+"/")
-		if err := writePkgFileToNode(target, pkg, types.ArtifactManifest, mani, types.K3sManifestsDir, "0644"); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
-func writePkgFileToNode(target types.Node, pkg types.Package, t types.ArtifactType, name, destDir, mode string) error {
+func writePkgFileToNode(target types.Node, pkg types.Package, t types.ArtifactType, name, destDir, mode string, vars map[string]string) error {
 	artifact := &types.Artifact{Type: t, Name: name}
 	if err := pkg.Get(artifact); err != nil {
 		return err
 	}
-	// artifact.Name will reflect the correct basename to use after a Get (in case it contains an internal leading directory)
-	// this needs to be fixed
+	if t == types.ArtifactManifest && len(vars) > 0 {
+		if err := artifact.ApplyVariables(vars); err != nil {
+			return err
+		}
+	}
 	return target.WriteFile(artifact.Body, path.Join(destDir, artifact.Name), mode, artifact.Size)
 }
 

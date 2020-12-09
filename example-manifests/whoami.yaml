@@ -48,7 +48,7 @@ metadata:
   namespace: default
 spec:
   rules:
-    - host: whoami.local
+    - host: "%{ DNS_NAME }"
       http:
         paths:
           - path: /
