@@ -51,6 +51,9 @@ const K3sKubeconfig = "/etc/rancher/k3s/k3s.yaml"
 // K3sInternalIPLabel is the label K3s uses for the internal IP of a node.
 const K3sInternalIPLabel = "k3s.io/internal-ip"
 
+// K3pManagedDockerLabel is the label placed on resources to mark that they were created by k3p.
+const K3pManagedDockerLabel = "k3p.io/managed"
+
 // K3pDockerClusterLabel is the label placed on k3p docker assets containing the cluster name.
 const K3pDockerClusterLabel = "k3p.io/cluster-name"
 

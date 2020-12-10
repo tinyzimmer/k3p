@@ -47,6 +47,10 @@ the provided host is remoted into, with the same connection options as for the n
 the installation manifest.
 `)
 
+	nodesAddCmd.RegisterFlagCompletionFunc("node-role", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"server", "agent"}, cobra.ShellCompDirectiveDefault
+	})
+
 	nodesCmd.AddCommand(nodesAddCmd)
 	rootCmd.AddCommand(nodesCmd)
 }

@@ -45,6 +45,16 @@ func init() {
 	buildCmd.Flags().StringVarP(&buildOpts.ConfigFile, "config", "c", "", "An optional config file providing variables to be used at installation")
 	buildCmd.Flags().BoolVarP(&cache.NoCache, "no-cache", "N", false, "Disable the use of the local cache when downloading assets")
 
+	buildCmd.MarkFlagDirname("exclude")
+	buildCmd.MarkFlagDirname("manifests")
+	buildCmd.MarkFlagFilename("config", "json", "yaml", "yml")
+	buildCmd.RegisterFlagCompletionFunc("pull-policy", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{string(types.PullPolicyAlways), string(types.PullPolicyIfNotPresent), string(types.PullPolicyNever)}, cobra.ShellCompDirectiveDefault
+	})
+	buildCmd.RegisterFlagCompletionFunc("arch", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"amd64", "arm64", "arm"}, cobra.ShellCompDirectiveDefault
+	})
+
 	rootCmd.AddCommand(buildCmd)
 }
 

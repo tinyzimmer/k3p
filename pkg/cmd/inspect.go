@@ -23,6 +23,21 @@ func init() {
 	inspectCmd.Flags().BoolVarP(&inspectDetails, "details", "D", false, "Show additional details on package content")
 	inspectCmd.Flags().StringVarP(&inspectManifest, "manifest", "m", "", "Dump the contents of the specified manifest")
 
+	inspectCmd.RegisterFlagCompletionFunc("manifest", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		f, err := os.Open(args[0])
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveDefault
+		}
+		defer f.Close()
+		pkg, err := v1.Load(f)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveDefault
+		}
+		defer pkg.Close()
+		manifest := pkg.GetMeta().GetManifest()
+		return manifest.K8sManifests, cobra.ShellCompDirectiveDefault
+	})
+
 	rootCmd.AddCommand(inspectCmd)
 }
 
@@ -35,6 +50,7 @@ var inspectCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		defer f.Close()
 		pkg, err := v1.Load(f)
 		if err != nil {
 			return err

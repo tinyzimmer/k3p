@@ -19,6 +19,36 @@ import (
 	"github.com/tinyzimmer/k3p/pkg/types"
 )
 
+// ListDockerClusters will list the current docker clusters on the machine.
+func ListDockerClusters() ([]string, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, err
+	}
+	containers, err := cli.ContainerList(context.TODO(), dockertypes.ContainerListOptions{
+		Filters: types.AllDockerClusterFilters(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	clusters := make([]string, 0)
+	for _, container := range containers {
+		if cluster, ok := container.Labels[types.K3pDockerClusterLabel]; ok {
+			clusters = appendIfMissing(clusters, cluster)
+		}
+	}
+	return clusters, nil
+}
+
+func appendIfMissing(ss []string, s string) []string {
+	for _, x := range ss {
+		if x == s {
+			return ss
+		}
+	}
+	return append(ss, s)
+}
+
 // LoadDockerCluster will load all the nodes associated with a docker cluster. Close only needs
 // to be run on one of the returned nodes, as they all share an underlying client.
 func LoadDockerCluster(name string) ([]*Docker, error) {

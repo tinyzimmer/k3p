@@ -39,7 +39,16 @@ type DockerClusterOptions struct {
 
 // DockerClusterFilters returns the filters for matching all components of a given cluster.
 func DockerClusterFilters(name string) filters.Args {
-	return filters.NewArgs(filters.Arg("label", fmt.Sprintf("%s=%s", K3pDockerClusterLabel, name)))
+	return filters.NewArgs(
+		filters.Arg("label", fmt.Sprintf("%s=true", K3pManagedDockerLabel)),
+		filters.Arg("label", fmt.Sprintf("%s=%s", K3pDockerClusterLabel, name)),
+	)
+}
+
+// AllDockerClusterFilters returns the filters for listining all docker clusters installed
+// to the system.
+func AllDockerClusterFilters() filters.Args {
+	return filters.NewArgs(filters.Arg("label", fmt.Sprintf("%s=true", K3pManagedDockerLabel)))
 }
 
 // DockerOptionsFromContainer converts a container spec to docker node options.
@@ -64,6 +73,7 @@ func DockerOptionsFromContainer(container dockertypes.Container) *DockerNodeOpti
 // GetLabels returns the labels for the node represented by these options.
 func (d *DockerClusterOptions) GetLabels() map[string]string {
 	return map[string]string{
+		K3pManagedDockerLabel: "true",
 		K3pDockerClusterLabel: d.ClusterName,
 	}
 }

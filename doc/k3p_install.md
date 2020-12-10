@@ -58,15 +58,15 @@ k3p install PACKAGE [flags]
                                   https://rancher.com/docs/k3s/latest/en/installation/install-options/server-config
                                   
       --kubeconfig-mode string    The mode to set on the k3s kubeconfig. Default is to only allow root access
-      --map-ports strings         DOCKER ONLY: Additional port mappings to apply to the leader node
   -n, --node-name string          An optional name to give this node in the cluster
   -k, --private-key string        The path to a private key to use when authenticating against the remote host, 
                                   if not provided you will be prompted for a password (default "/home/<user>/.ssh/id_rsa")
+  -p, --publish stringArray       DOCKER ONLY: Additional port mappings to apply to the leader node
       --resolv-conf string        The path of a resolv-conf file to use when configuring DNS in the cluster.
                                   When used with the --host flag, the path must reside on the remote system (this will change in the future).
       --servers int               DOCKER ONLY: The number of servers to run in the cluster (default 1)
       --set stringArray           Values to set to configurations in the package in the format of --set <name>=<value>
-  -p, --ssh-port int              The port to use when connecting to the remote host over SSH (default 22)
+  -P, --ssh-port int              The port to use when connecting to the remote host over SSH (default 22)
   -u, --ssh-user string           The username to use when authenticating against the remote host (default "<user>")
   -f, --values string             An optional json or yaml file containing key-value pairs of package configurations
       --write-kubeconfig string   Write a copy of the admin client to this file

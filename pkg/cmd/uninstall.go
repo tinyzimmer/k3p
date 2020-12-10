@@ -17,6 +17,14 @@ func init() {
 		log.Error(err)
 	}
 
+	uninstallCmd.RegisterFlagCompletionFunc("name", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		clusters, err := node.ListDockerClusters()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveDefault
+		}
+		return clusters, cobra.ShellCompDirectiveDefault
+	})
+
 	rootCmd.AddCommand(uninstallCmd)
 }
 
