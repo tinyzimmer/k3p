@@ -19,7 +19,7 @@ The k3p command provides an easy method for packaging a kubernetes environment i
 
 ### SEE ALSO
 
-* [k3p build](k3p_build.md)	 - Build an embedded k3s distribution package
+* [k3p build](k3p_build.md)	 - Build a k3s distribution package
 * [k3p cache](k3p_cache.md)	 - Cache management options
 * [k3p completion](k3p_completion.md)	 - Generate completion script
 * [k3p inspect](k3p_inspect.md)	 - Inspect the given package

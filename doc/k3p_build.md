@@ -1,6 +1,6 @@
 ## k3p build
 
-Build an embedded k3s distribution package
+Build a k3s distribution package
 
 ```
 k3p build [flags]

@@ -60,7 +60,7 @@ func init() {
 
 var buildCmd = &cobra.Command{
 	Use:   "build",
-	Short: "Build an embedded k3s distribution package",
+	Short: "Build a k3s distribution package",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// validate pull policy first
 		switch types.PullPolicy(strings.ToLower(buildPullPolicy)) {
