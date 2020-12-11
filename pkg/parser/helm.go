@@ -2,11 +2,9 @@ package parser
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path"
 	"strings"
 	"text/template"
@@ -128,7 +126,7 @@ func (p *ManifestParser) packageHelmChartToArtifacts(chartPath string) ([]*types
 
 	// package the chart to a temp file
 	var packagedChartBytes []byte
-	var packagedChartName string
+	var packagedChartFilename string
 	if ok, err := chartutil.IsChartDir(chartPath); err == nil && ok {
 		// Chart is a directory that needs to be packaged
 		tmpDir, err := util.GetTempDir()
@@ -136,20 +134,13 @@ func (p *ManifestParser) packageHelmChartToArtifacts(chartPath string) ([]*types
 			return nil, err
 		}
 		defer os.RemoveAll(tmpDir)
-		log.Debugf("Executing command: helm package %s -d %s\n", chartPath, tmpDir)
-		_, err = exec.Command("helm", "package", chartPath, "-d", tmpDir).Output()
+		log.Debugf("Packaging helm chart %q to %q\n", chart.Name(), tmpDir)
+		chartPkg, err := chartutil.Save(chart, tmpDir)
 		if err != nil {
 			return nil, err
 		}
-		files, err := ioutil.ReadDir(tmpDir)
-		if err != nil {
-			return nil, err
-		}
-		if len(files) != 1 {
-			return nil, errors.New("helm package command produced more or less than 1 one artifact")
-		}
-		chartPkg := path.Join(tmpDir, files[0].Name())
-		packagedChartName = path.Base(files[0].Name())
+		log.Debugf("Produced chart package at %q\n", chartPkg)
+		packagedChartFilename = path.Base(chartPkg)
 		packagedChartBytes, err = ioutil.ReadFile(chartPkg)
 		if err != nil {
 			return nil, err
@@ -157,7 +148,7 @@ func (p *ManifestParser) packageHelmChartToArtifacts(chartPath string) ([]*types
 	} else {
 		// Chart is already packaged
 		log.Debugf("Chart at %q is already packaged, adding directly to manifest\n", chartPath)
-		packagedChartName = path.Base(chartPath)
+		packagedChartFilename = path.Base(chartPath)
 		packagedChartBytes, err = ioutil.ReadFile(chartPath)
 		if err != nil {
 			return nil, err
@@ -168,8 +159,8 @@ func (p *ManifestParser) packageHelmChartToArtifacts(chartPath string) ([]*types
 
 	var out bytes.Buffer
 	if err := helmCRTmpl.Execute(&out, map[string]string{
-		"Name":          strings.Replace(stripExt, ".", "-", -1),
-		"Filename":      packagedChartName,
+		"Name":          chart.Name(),
+		"Filename":      packagedChartFilename,
 		"ValuesContent": valuesContent,
 	}); err != nil {
 		return nil, err
@@ -184,7 +175,7 @@ func (p *ManifestParser) packageHelmChartToArtifacts(chartPath string) ([]*types
 		},
 		{
 			Type: types.ArtifactStatic,
-			Name: packagedChartName,
+			Name: packagedChartFilename,
 			Body: ioutil.NopCloser(bytes.NewReader(packagedChartBytes)),
 			Size: int64(len(packagedChartBytes)),
 		},

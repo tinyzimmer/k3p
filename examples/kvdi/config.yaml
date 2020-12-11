@@ -46,4 +46,4 @@ helmValues:
         serviceMonitor:
           create: true
           labels:
-            release: kube-prometheus-stack-12-8-0
+            release: kube-prometheus-stack
