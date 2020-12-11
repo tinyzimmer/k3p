@@ -17,12 +17,12 @@ import (
 type BaseManifestParser struct {
 	ParseDir     string
 	ExcludeDirs  []string
-	HelmArgs     string
+	HelmValues   map[string]interface{}
 	Deserializer runtime.Decoder
 }
 
 // NewBaseManifestParser returns a new base parser with the given arguments.
-func NewBaseManifestParser(parseDir string, excludeDirs []string, helmArgs string) *BaseManifestParser {
+func NewBaseManifestParser(parseDir string, excludeDirs []string, helmValues map[string]interface{}) *BaseManifestParser {
 	// create a new scheme
 	sch := runtime.NewScheme()
 
@@ -33,7 +33,7 @@ func NewBaseManifestParser(parseDir string, excludeDirs []string, helmArgs strin
 	return &BaseManifestParser{
 		ParseDir:     parseDir,
 		ExcludeDirs:  excludeDirs,
-		HelmArgs:     helmArgs,
+		HelmValues:   helmValues,
 		Deserializer: serializer.NewCodecFactory(sch).UniversalDeserializer(),
 	}
 }
@@ -41,9 +41,13 @@ func NewBaseManifestParser(parseDir string, excludeDirs []string, helmArgs strin
 // GetParseDir returns the directory to be parsed for container images.
 func (b *BaseManifestParser) GetParseDir() string { return b.ParseDir }
 
-// GetHelmArgs returns the helm args to use when templating and packaging
-// charts
-func (b *BaseManifestParser) GetHelmArgs() string { return b.HelmArgs }
+// GetHelmValues returns the helm values for the given chart if any, or nil if there are none.
+func (b *BaseManifestParser) GetHelmValues(chartName string) interface{} {
+	if vals, ok := b.HelmValues[chartName]; ok {
+		return vals
+	}
+	return nil
+}
 
 // StripParseDir is a convenience method for stripping the parse directory from the beginning
 // of a path.

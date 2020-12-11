@@ -1,5 +1,10 @@
 package types
 
+import (
+	"fmt"
+	"reflect"
+)
+
 // PackageMeta represents metadata included with a package.
 type PackageMeta struct {
 	// The version of this manifest, only v1 currently
@@ -34,6 +39,47 @@ func (p *PackageMeta) DeepCopy() *PackageMeta {
 		meta.PackageConfig = p.PackageConfig.DeepCopy()
 	}
 	return meta
+}
+
+// Sanitize will iterate the PackageConfig and convert any `map[interface{}]interface{}`
+// to `map[string]interface{}`. This is required for serializing meta until I find a better
+// way to deal with helm values.
+func (p *PackageMeta) Sanitize() {
+	if p.PackageConfig == nil {
+		return
+	}
+	newHelmValues := make(map[string]interface{})
+	for key, value := range p.PackageConfig.HelmValues {
+		newHelmValues[key] = sanitizeValue(value)
+	}
+	p.PackageConfig.HelmValues = newHelmValues
+}
+
+func sanitizeValue(val interface{}) interface{} {
+	switch reflect.TypeOf(val).Kind() {
+	case reflect.Map:
+		if m, ok := val.(map[interface{}]interface{}); ok {
+			newMap := make(map[string]interface{})
+			for k, v := range m {
+				kStr := fmt.Sprintf("%v", k)
+				newMap[kStr] = sanitizeValue(v)
+			}
+			return newMap
+		}
+		if m, ok := val.(map[string]interface{}); ok {
+			// if the keys are already strings, we still need to descend
+			newMap := make(map[string]interface{})
+			for k, v := range m {
+				newMap[k] = sanitizeValue(v)
+			}
+			return newMap
+		}
+		// otherwise just return the regular map, but this may not catch
+		// all cases yet
+		return val
+	default:
+		return val
+	}
 }
 
 // GetName returns the name of the package.

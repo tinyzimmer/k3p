@@ -164,7 +164,7 @@ func (m *manager) AddNode(newNode types.Node, opts *types.AddNodeOptions) error 
 	}
 	tokenStr := strings.TrimSpace(string(token))
 
-	var vars map[string]string
+	var installedConfig types.InstallConfig
 	if cfg := pkg.GetMeta().GetPackageConfig(); cfg != nil {
 		f, err := m.leader.GetFile(types.InstalledConfigFile)
 		if err != nil {
@@ -175,26 +175,27 @@ func (m *manager) AddNode(newNode types.Node, opts *types.AddNodeOptions) error 
 		if err != nil {
 			return err
 		}
-		if err := json.Unmarshal(body, &vars); err != nil {
+		if err := json.Unmarshal(body, &installedConfig); err != nil {
 			return err
 		}
 	}
 
-	if err := util.SyncPackageToNode(newNode, pkg, vars); err != nil {
+	if err := util.SyncPackageToNode(newNode, pkg, &installedConfig); err != nil {
 		return err
 	}
 
 	log.Infof("Joining instance as a new %s\n", opts.NodeRole)
-	execOpts := buildInstallOpts(remoteAddr, tokenStr, string(opts.NodeRole))
+	execOpts := buildInstallOpts(&installedConfig, remoteAddr, tokenStr, string(opts.NodeRole))
 	return newNode.Execute(execOpts)
 }
 
-func buildInstallOpts(remoteAddr, token, nodeRole string) *types.ExecuteOptions {
+func buildInstallOpts(cfg *types.InstallConfig, remoteAddr, token, nodeRole string) *types.ExecuteOptions {
 	return &types.ExecuteOptions{
 		Env: map[string]string{
 			"INSTALL_K3S_SKIP_DOWNLOAD": "true",
 			"K3S_URL":                   fmt.Sprintf("https://%s:6443", remoteAddr),
 			"K3S_TOKEN":                 token,
+			"INSTALL_K3S_EXEC":          cfg.Env["INSTALL_K3S_EXEC"],
 		},
 		Command:   fmt.Sprintf("sh %s %s", path.Join(types.K3sScriptsDir, "install.sh"), nodeRole),
 		LogPrefix: "K3S",

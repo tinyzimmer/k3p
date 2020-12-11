@@ -7,16 +7,18 @@ import (
 	"path/filepath"
 	"strings"
 
+	"gopkg.in/yaml.v2"
+	"helm.sh/helm/pkg/chartutil"
+
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 	"github.com/tinyzimmer/k3p/pkg/util"
-	"gopkg.in/yaml.v2"
 )
 
 // NewManifestParser returns an interface for parsing container images from the given directory.
-func NewManifestParser(parseDir string, excludeDirs []string, helmArgs string) types.ManifestParser {
+func NewManifestParser(parseDir string, excludeDirs []string, helmValues map[string]interface{}) types.ManifestParser {
 	return &ManifestParser{
-		BaseManifestParser: NewBaseManifestParser(parseDir, excludeDirs, helmArgs),
+		BaseManifestParser: NewBaseManifestParser(parseDir, excludeDirs, helmValues),
 	}
 }
 
@@ -47,7 +49,7 @@ func (p *ManifestParser) ParseImages() ([]string, error) {
 				return filepath.SkipDir
 			}
 			// Check if it's a helm chart
-			if isHelmChart(file) {
+			if ok, err := chartutil.IsChartDir(file); err == nil && ok {
 				log.Info("Detected helm chart at", file)
 				containerImages, err := p.detectImagesFromHelmChart(file)
 				if err != nil {
@@ -119,7 +121,7 @@ func (p *ManifestParser) ParseManifests() ([]*types.Artifact, error) {
 				log.Info("Skipping excluded directory", file)
 				return filepath.SkipDir
 			}
-			if isHelmChart(file) {
+			if ok, err := chartutil.IsChartDir(file); err == nil && ok {
 				log.Infof("Packaging helm chart: %q\n", file)
 				helmArtifacts, err := p.packageHelmChartToArtifacts(file)
 				if err != nil {
@@ -178,7 +180,7 @@ func (p *ManifestParser) ParseManifests() ([]*types.Artifact, error) {
 
 		// if the file doesn't appear valid, continue
 		if !fileIsValid {
-			log.Warningf("Skipping %q since it contains invalid kubernetes yaml\n", file)
+			log.Debugf("Skipping %q for manifest parsing since it contains invalid kubernetes yaml\n", file)
 			return nil
 		}
 

@@ -12,6 +12,10 @@ import (
 	"text/template"
 
 	"github.com/Masterminds/sprig"
+	"gopkg.in/yaml.v2"
+	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/chartutil"
+	"helm.sh/helm/v3/pkg/engine"
 
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
@@ -33,39 +37,66 @@ spec:
 {{- end }}
 `))
 
-func isHelmChart(dir string) bool {
-	info, err := os.Stat(path.Join(dir, "Chart.yaml"))
-	return err == nil && !info.IsDir()
-}
-
 func isHelmArchive(file string) bool {
-	log.Debug("Executing command: helm inspect chart", file)
-	return exec.Command("helm", "inspect", "chart", file).Run() == nil
+	log.Debug("Attempting to load", file, "as helm chart")
+	_, err := loader.Load(file)
+	return err == nil
 }
 
 func (p *ManifestParser) detectImagesFromHelmChart(chartPath string) ([]string, error) {
 	images := make([]string, 0)
 
-	args := []string{"template", chartPath}
-	if helmArgs := p.GetHelmArgs(); helmArgs != "" {
-		args = append(args, strings.Fields(helmArgs)...)
-	}
-
-	log.Debugf("Executing command: helm %s\n", strings.Join(args, " "))
-	out, err := exec.Command("helm", args...).Output()
+	chart, err := loader.Load(chartPath)
 	if err != nil {
 		return nil, err
 	}
 
-	// iterate all the yaml objects in the file
-	rawYamls := strings.Split(string(out), "---")
-	for _, raw := range rawYamls {
+	var helmVals chartutil.Values
+	if vals := p.GetHelmValues(chart.Name()); vals != nil {
+		raw, err := yaml.Marshal(p.HelmValues)
+		if err != nil {
+			return nil, err
+		}
+		helmVals, err = chartutil.ReadValues(raw)
+		if err != nil {
+			return nil, err
+		}
+		log.Debugf("Using the following values for chart %q: %+v\n", chart.Name(), helmVals)
+	}
+
+	if err := chartutil.ProcessDependencies(chart, helmVals); err != nil {
+		return nil, err
+	}
+
+	options := chartutil.ReleaseOptions{
+		Name:      "k3p-build",
+		Namespace: "default",
+		Revision:  1,
+		IsInstall: true,
+		IsUpgrade: false,
+	}
+	valuesToRender, err := chartutil.ToRenderValues(chart, helmVals, options, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debugf("Rendering helm chart %q to kubernetes manifests\n", chart.Name())
+	objects, err := engine.Render(chart, valuesToRender)
+	if err != nil {
+		return nil, err
+	}
+
+	// iterate all the yaml objects in the rendered templates
+	for _, rendered := range objects {
 		// Check if this is empty space
-		if strings.TrimSpace(raw) == "" {
+		if len(strings.TrimSpace(rendered)) == 0 {
 			continue
 		}
 		// Decode the object
-		obj, err := p.Decode([]byte(raw))
+		obj, err := p.Decode([]byte(rendered))
 		if err != nil {
 			log.Debugf("Skipping invalid kubernetes object in rendered helm template: %s\n", err.Error())
 			continue
@@ -80,42 +111,25 @@ func (p *ManifestParser) detectImagesFromHelmChart(chartPath string) ([]string, 
 }
 
 func (p *ManifestParser) packageHelmChartToArtifacts(chartPath string) ([]*types.Artifact, error) {
-
-	// only support values files for now, need to find a better way to do this
-	valuesFiles := make([]string, 0)
-	if helmArgs := p.GetHelmArgs(); helmArgs != "" {
-		fields := strings.Fields(helmArgs)
-		for idx, arg := range fields {
-			if strings.HasPrefix(arg, "--values=") {
-				f := strings.Join(strings.Split(arg, "=")[1:], "=")
-				valuesFiles = append(valuesFiles, f)
-				continue
-			}
-			if arg == "-f" || arg == "--values" {
-				if len(fields) < idx {
-					return nil, errors.New("got -f or --values helm flag without an argument")
-				}
-				valuesFiles = append(valuesFiles, fields[idx+1])
-			}
-		}
+	chart, err := loader.Load(chartPath)
+	if err != nil {
+		return nil, err
 	}
-	log.Debug("Combining the following values files for helm:", valuesFiles)
+
 	var valuesContent string
-	if len(valuesFiles) > 0 {
-		for _, f := range valuesFiles {
-			body, err := ioutil.ReadFile(f)
-			if err != nil {
-				return nil, err
-			}
-			valuesContent = valuesContent + string(body) + "\n"
+	if vals := p.GetHelmValues(chart.Name()); vals != nil {
+		log.Debugf("Marshaling helm values for chart %q: %+v\n", chart.Name(), vals)
+		valuesBytes, err := yaml.Marshal(vals)
+		if err != nil {
+			return nil, err
 		}
+		valuesContent = string(valuesBytes)
 	}
 
 	// package the chart to a temp file
 	var packagedChartBytes []byte
 	var packagedChartName string
-	var err error
-	if isHelmChart(chartPath) {
+	if ok, err := chartutil.IsChartDir(chartPath); err == nil && ok {
 		// Chart is a directory that needs to be packaged
 		tmpDir, err := util.GetTempDir()
 		if err != nil {

@@ -1,0 +1,3 @@
+variables:
+  - name: DNS_NAME
+    default: "localhost"

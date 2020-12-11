@@ -36,7 +36,6 @@ func init() {
 	buildCmd.Flags().StringVar(&buildOpts.K3sVersion, "k3s-version", types.VersionLatest, "A specific k3s version to bundle with the package, overrides --channel")
 	buildCmd.Flags().StringVarP(&buildOpts.K3sChannel, "channel", "C", "stable", "The release channel to retrieve the version of k3s from")
 	buildCmd.Flags().StringArrayVarP(&buildOpts.ManifestDirs, "manifests", "m", []string{cwd}, "Directories to scan for kubernetes manifests and charts, defaults to the current directory, can be specified multiple times")
-	buildCmd.Flags().StringVarP(&buildOpts.HelmArgs, "helm-args", "H", "", "Arguments to pass to the 'helm template' command when searching for images")
 	buildCmd.Flags().StringSliceVarP(&buildOpts.Excludes, "exclude", "e", []string{}, "Directories to exclude when reading the manifest directory")
 	buildCmd.Flags().StringVarP(&buildOpts.Arch, "arch", "a", runtime.GOARCH, "The architecture to package the distribution for. Only (amd64, arm, and arm64 are supported)")
 	buildCmd.Flags().StringVarP(&buildOpts.ImageFile, "image-file", "I", "", "A file containing a list of extra images to bundle with the archive")

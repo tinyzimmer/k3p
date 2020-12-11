@@ -120,6 +120,7 @@ func (rw *readWriter) Put(artifact *types.Artifact) error {
 }
 
 func (rw *readWriter) PutMeta(meta *types.PackageMeta) error {
+	meta.Sanitize()
 	out, err := json.Marshal(meta)
 	if err != nil {
 		return err

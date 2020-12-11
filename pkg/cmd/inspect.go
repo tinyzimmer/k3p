@@ -160,7 +160,7 @@ var inspectCmd = &cobra.Command{
 			fmt.Println("    ", artifact.Name, "\t", byteCountSI(artifact.Size))
 		}
 
-		if cfg := meta.GetPackageConfig(); cfg != nil {
+		if cfg := meta.GetPackageConfig(); cfg != nil && len(cfg.Variables) > 0 {
 			fmt.Println()
 			fmt.Println("  PARAMETERS")
 			for _, vari := range cfg.Variables {

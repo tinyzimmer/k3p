@@ -50,11 +50,6 @@ func (i *installer) Install(target types.Node, pkg types.Package, opts *types.In
 		}
 	}
 
-	// unpack the manifest onto the node
-	if err := util.SyncPackageToNode(target, pkg, opts.Variables); err != nil {
-		return err
-	}
-
 	if opts.InitHA {
 		// append --cluster-init
 		opts.K3sExecArgs = opts.K3sExecArgs + " --cluster-init"
@@ -70,9 +65,20 @@ func (i *installer) Install(target types.Node, pkg types.Package, opts *types.In
 		}
 	}
 
+	execOpts := opts.ToExecOpts(pkg.GetMeta().GetPackageConfig())
+	installedConfig := &types.InstallConfig{
+		Variables: opts.Variables,
+		Env:       execOpts.Env,
+	}
+
+	// unpack the manifest onto the node
+	if err := util.SyncPackageToNode(target, pkg, installedConfig); err != nil {
+		return err
+	}
+
 	// Install K3s
 	log.Info("Running k3s installation script")
-	return target.Execute(opts.ToExecOpts())
+	return target.Execute(execOpts)
 }
 
 func promptEULA(eula *types.Artifact, autoAccept bool) error {

@@ -15,7 +15,6 @@ k3p build [flags]
   -E, --eula string             A file containing an End User License Agreement to display to the user upon installing the package
   -e, --exclude strings         Directories to exclude when reading the manifest directory
       --exclude-images          Don't include container images with the final archive
-  -H, --helm-args string        Arguments to pass to the 'helm template' command when searching for images
   -h, --help                    help for build
   -I, --image-file string       A file containing a list of extra images to bundle with the archive
   -i, --images strings          A comma separated list of images to include with the archive

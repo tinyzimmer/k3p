@@ -67,13 +67,13 @@ func GenerateToken(length int) string {
 
 // SyncPackageToNode is a convenience method for extracting the contents of a package manifest
 // to a k3s node.
-func SyncPackageToNode(target types.Node, pkg types.Package, vars map[string]string) error {
+func SyncPackageToNode(target types.Node, pkg types.Package, cfg *types.InstallConfig) error {
 	meta := pkg.GetMeta()
 
 	if len(meta.Manifest.Bins) > 0 {
 		log.Info("Installing binaries to", types.K3sBinDir)
 		for _, bin := range meta.Manifest.Bins {
-			if err := writePkgFileToNode(target, pkg, types.ArtifactBin, path.Base(bin), types.K3sBinDir, "0755", vars); err != nil {
+			if err := writePkgFileToNode(target, pkg, types.ArtifactBin, path.Base(bin), types.K3sBinDir, "0755", cfg.Variables); err != nil {
 				return err
 			}
 		}
@@ -82,7 +82,7 @@ func SyncPackageToNode(target types.Node, pkg types.Package, vars map[string]str
 	if len(meta.Manifest.Scripts) > 0 {
 		log.Info("Installing scripts to", types.K3sScriptsDir)
 		for _, script := range meta.Manifest.Scripts {
-			if err := writePkgFileToNode(target, pkg, types.ArtifactScript, path.Base(script), types.K3sScriptsDir, "0755", vars); err != nil {
+			if err := writePkgFileToNode(target, pkg, types.ArtifactScript, path.Base(script), types.K3sScriptsDir, "0755", cfg.Variables); err != nil {
 				return err
 			}
 		}
@@ -91,7 +91,7 @@ func SyncPackageToNode(target types.Node, pkg types.Package, vars map[string]str
 	if len(meta.Manifest.Images) > 0 {
 		log.Info("Installing images to", types.K3sImagesDir)
 		for _, imgs := range meta.Manifest.Images {
-			if err := writePkgFileToNode(target, pkg, types.ArtifactImages, path.Base(imgs), types.K3sImagesDir, "0644", vars); err != nil {
+			if err := writePkgFileToNode(target, pkg, types.ArtifactImages, path.Base(imgs), types.K3sImagesDir, "0644", cfg.Variables); err != nil {
 				return err
 			}
 		}
@@ -100,7 +100,7 @@ func SyncPackageToNode(target types.Node, pkg types.Package, vars map[string]str
 	if len(meta.Manifest.K8sManifests) > 0 {
 		log.Info("Installing manifests to", types.K3sManifestsDir)
 		for _, mani := range meta.Manifest.K8sManifests {
-			if err := writePkgFileToNode(target, pkg, types.ArtifactManifest, mani, types.K3sManifestsDir, "0644", vars); err != nil {
+			if err := writePkgFileToNode(target, pkg, types.ArtifactManifest, mani, types.K3sManifestsDir, "0644", cfg.Variables); err != nil {
 				return err
 			}
 		}
@@ -110,21 +110,26 @@ func SyncPackageToNode(target types.Node, pkg types.Package, vars map[string]str
 		log.Info("Installing static content to", types.K3sStaticDir)
 		for _, static := range meta.Manifest.Static {
 			static = strings.TrimPrefix(static, "static/") // ugly hack, should fix to come back without the prefix
-			if err := writePkgFileToNode(target, pkg, types.ArtifactStatic, static, types.K3sStaticDir, "0644", vars); err != nil {
+			if err := writePkgFileToNode(target, pkg, types.ArtifactStatic, static, types.K3sStaticDir, "0644", cfg.Variables); err != nil {
 				return err
 			}
 		}
 	}
 
-	if len(vars) > 0 {
-		out, err := json.MarshalIndent(vars, "", "  ")
-		if err != nil {
-			return err
-		}
-		rdr := ioutil.NopCloser(bytes.NewReader(out))
-		if err := target.WriteFile(rdr, types.InstalledConfigFile, "0644", int64(len(out))); err != nil {
-			return err
-		}
+	// Ugly hack to make sure we don't include the --cluster-init flag for future servers to use
+	// a lot of how these values get passed around needs refactoring.
+	cfgCopy := cfg.DeepCopy()
+	if _, ok := cfgCopy.Env["INSTALL_K3S_EXEC"]; ok {
+		cfgCopy.Env["INSTALL_K3S_EXEC"] = strings.Replace(cfgCopy.Env["INSTALL_K3S_EXEC"], "--cluster-init", "", 1)
+	}
+
+	out, err := json.MarshalIndent(cfgCopy, "", "  ")
+	if err != nil {
+		return err
+	}
+	rdr := ioutil.NopCloser(bytes.NewReader(out))
+	if err := target.WriteFile(rdr, types.InstalledConfigFile, "0644", int64(len(out))); err != nil {
+		return err
 	}
 
 	return nil

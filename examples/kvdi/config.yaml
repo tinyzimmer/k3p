@@ -1,0 +1,11 @@
+serverConfig:
+  disable: traefik
+
+helmValues:
+  kvdi:
+   vdi:
+    spec:
+      auth:
+        allowAnonymous: true
+      app:
+        auditLog: true

@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"path"
+	"strings"
 )
 
 // Installer is an interface for laying a package manifest down on a system
@@ -39,7 +40,7 @@ type InstallOptions struct {
 
 // ToExecOpts converts these install options into execute options to pass to a
 // node.
-func (opts *InstallOptions) ToExecOpts() *ExecuteOptions {
+func (opts *InstallOptions) ToExecOpts(cfg *PackageConfig) *ExecuteOptions {
 	env := map[string]string{
 		"INSTALL_K3S_SKIP_DOWNLOAD": "true",
 	}
@@ -64,8 +65,21 @@ func (opts *InstallOptions) ToExecOpts() *ExecuteOptions {
 		env["K3S_URL"] = opts.ServerURL
 	}
 
-	if opts.K3sExecArgs != "" {
-		env["INSTALL_K3S_EXEC"] = opts.K3sExecArgs
+	// These are the overrides provided by the user
+	execFields := strings.Fields(opts.K3sExecArgs)
+
+	// Build out an exec string from the configuration
+	if cfg != nil {
+		switch opts.K3sRole {
+		case K3sRoleServer, "":
+			execFields = cfg.ServerArgs(execFields)
+		case K3sRoleAgent:
+			execFields = cfg.AgentArgs(execFields)
+		}
+	}
+
+	if args := strings.Join(execFields, " "); args != "" {
+		env["INSTALL_K3S_EXEC"] = args
 	}
 
 	secrets := []string{}

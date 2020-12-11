@@ -3,6 +3,7 @@ package build
 import (
 	"io/ioutil"
 	"os"
+	"path"
 	"strings"
 
 	v1 "github.com/tinyzimmer/k3p/pkg/build/package/v1"
@@ -41,6 +42,27 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 		log.Infof("Building package %q\n", opts.Name)
 	}
 
+	packageMeta := types.PackageMeta{
+		MetaVersion: "v1",
+		Name:        opts.Name,
+		Version:     opts.BuildVersion,
+		K3sVersion:  opts.K3sVersion,
+		Arch:        opts.Arch,
+	}
+
+	if opts.ConfigFile != "" {
+		log.Debugf("Reading configuration file at %q\n", opts.ConfigFile)
+		conf, err := types.PackageConfigFromFile(opts.ConfigFile)
+		if err != nil {
+			return err
+		}
+		packageMeta.PackageConfig = conf
+		if err := packageMeta.PackageConfig.ExpandHelmValues(path.Dir(opts.ConfigFile)); err != nil {
+			return err
+		}
+		log.Debugf("Unmarshaled config: %+v\n", *packageMeta.PackageConfig)
+	}
+
 	if opts.K3sVersion == types.VersionLatest {
 		log.Info("Detecting latest k3s version for channel", opts.K3sChannel)
 		latest, err := getLatestK3sForChannel(opts.K3sChannel)
@@ -60,7 +82,11 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 	}
 
 	for _, dir := range opts.ManifestDirs {
-		parser := parser.NewManifestParser(dir, opts.Excludes, opts.HelmArgs)
+		var helmValues map[string]interface{}
+		if packageMeta.PackageConfig.HelmValues != nil {
+			helmValues = packageMeta.PackageConfig.HelmValues
+		}
+		parser := parser.NewManifestParser(dir, opts.Excludes, helmValues)
 
 		log.Infof("Searching %q for kubernetes manifests to include in the archive\n", dir)
 		manifests, err := parser.ParseManifests()
@@ -104,29 +130,13 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 	}
 
 	log.Info("Writing package metadata")
-	packageMeta := types.PackageMeta{
-		MetaVersion: "v1",
-		Name:        opts.Name,
-		Version:     opts.BuildVersion,
-		K3sVersion:  opts.K3sVersion,
-		Arch:        opts.Arch,
-	}
-	if opts.ConfigFile != "" {
-		log.Debugf("Reading configuration file at %q\n", opts.ConfigFile)
-		conf, err := types.PackageConfigFromFile(opts.ConfigFile)
-		if err != nil {
-			return err
-		}
-		packageMeta.PackageConfig = conf
-		log.Debugf("Unmarshaled config: %+v\n", *packageMeta.PackageConfig)
-	}
 	log.Debugf("Appending meta: %+v\n", packageMeta)
 	if err := b.writer.PutMeta(&packageMeta); err != nil {
 		return err
 	}
 	log.Debugf("Complete package meta: %+v\n", b.writer.GetMeta())
-	log.Debugf("Complete package manifest: %+v\n", *b.writer.GetMeta().Manifest)
-
+	log.Debugf("Complete package manifest: %+v\n", *b.writer.GetMeta().GetManifest())
+	log.Debugf("Complete package config: %+v\n", *b.writer.GetMeta().GetPackageConfig())
 	log.Infof("Archiving version %q of %q to %q\n", opts.BuildVersion, opts.Name, opts.Output)
 	archive, err := b.writer.Archive()
 	if err != nil {
