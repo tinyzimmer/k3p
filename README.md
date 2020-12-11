@@ -90,4 +90,5 @@ NAME                      READY   STATUS    RESTARTS   AGE
 whoami-5dc4dd9cdf-qvvnz   1/1     Running   0          32s
 ```
 
-For further information on adding worker nodes and/or setting up HA, you can view the command documentation, however more complete documentation will come in the future. 
+For further information on adding worker nodes and/or setting up HA, you can view the command documentation, 
+however more complete documentation will come in the future in the form of [examples](examples/).
