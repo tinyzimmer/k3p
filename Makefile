@@ -24,7 +24,7 @@ $(BIN):
 
 PKG_ARGS ?=
 $(PACKAGE): $(BIN)
-	$(BIN) build -o $(PACKAGE) --name k3p-test --config example-manifests/config.yaml $(PKG_ARGS)
+	$(BIN) build -o $(PACKAGE) --name k3p-test --manifests examples/whoami --config examples/whoami/config.yaml $(PKG_ARGS)
 
 docs:
 	go run hack/docgen.go
