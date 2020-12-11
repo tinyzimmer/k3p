@@ -1,4 +1,11 @@
 variables:
   - name: DNS_NAME
-    default: "whoami.local"
+    default: "localhost"
 
+dockerConfig:
+  name: test-cluster
+  ports:
+    - 8080:80@loadbalancer
+  servers: 3
+  values:
+    DNS_NAME: docker.local

@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	v1 "github.com/tinyzimmer/k3p/pkg/build/package/v1"
+	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 )
 
@@ -23,28 +24,34 @@ func init() {
 	inspectCmd.Flags().BoolVarP(&inspectDetails, "details", "D", false, "Show additional details on package content")
 	inspectCmd.Flags().StringVarP(&inspectManifest, "manifest", "m", "", "Dump the contents of the specified manifest")
 
-	inspectCmd.RegisterFlagCompletionFunc("manifest", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		f, err := os.Open(args[0])
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveDefault
-		}
-		defer f.Close()
-		pkg, err := v1.Load(f)
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveDefault
-		}
-		defer pkg.Close()
-		manifest := pkg.GetMeta().GetManifest()
-		return manifest.K8sManifests, cobra.ShellCompDirectiveDefault
-	})
+	inspectCmd.RegisterFlagCompletionFunc("manifest", completeManifests)
 
 	rootCmd.AddCommand(inspectCmd)
+}
+
+func completeManifests(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	log.Verbose = false
+	f, err := os.Open(args[0])
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveDefault
+	}
+	defer f.Close()
+	pkg, err := v1.Load(f)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveDefault
+	}
+	defer pkg.Close()
+	manifest := pkg.GetMeta().GetManifest()
+	return manifest.K8sManifests, cobra.ShellCompDirectiveDefault
 }
 
 var inspectCmd = &cobra.Command{
 	Use:   "inspect PACKAGE",
 	Short: "Inspect the given package",
 	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"tar"}, cobra.ShellCompDirectiveFilterFileExt
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		f, err := os.Open(args[0])
 		if err != nil {
@@ -151,6 +158,18 @@ var inspectCmd = &cobra.Command{
 				return err
 			}
 			fmt.Println("    ", artifact.Name, "\t", byteCountSI(artifact.Size))
+		}
+
+		if cfg := meta.GetPackageConfig(); cfg != nil {
+			fmt.Println()
+			fmt.Println("  PARAMETERS")
+			for _, vari := range cfg.Variables {
+				if vari.Default == "" {
+					fmt.Println("    ", vari.Name, "(required)")
+				} else {
+					fmt.Println("    ", vari.Name, fmt.Sprintf("(default %q)", vari.Default))
+				}
+			}
 		}
 
 		fmt.Println()

@@ -7,8 +7,11 @@ import (
 	"io/ioutil"
 	"path"
 	"strings"
+	"time"
 
 	v1 "github.com/tinyzimmer/k3p/pkg/build/package/v1"
+	"github.com/tinyzimmer/k3p/pkg/cluster/kubernetes"
+	"github.com/tinyzimmer/k3p/pkg/cluster/node"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 	"github.com/tinyzimmer/k3p/pkg/util"
@@ -19,7 +22,101 @@ func New(leader types.Node) types.ClusterManager { return &manager{leader: leade
 
 type manager struct{ leader types.Node }
 
-func (m *manager) RemoveNode(opts *types.RemoveNodeOptions) error { return nil }
+func (m *manager) getKubeconfig() ([]byte, error) {
+	f, err := m.leader.GetFile(types.K3sKubeconfig)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	body, err := ioutil.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	addr, err := m.leader.GetK3sAddress()
+	if err != nil {
+		return nil, err
+	}
+	return []byte(strings.Replace(string(body), "127.0.0.1", addr, 1)), nil
+}
+
+func (m *manager) RemoveNode(opts *types.RemoveNodeOptions) error {
+	log.Debug("Retrieve kubeconfig from leader")
+	cfg, err := m.getKubeconfig()
+	if err != nil {
+		return err
+	}
+	cli, err := kubernetes.New(cfg)
+	if err != nil {
+		return err
+	}
+	var nodeName string
+	if opts.Name != "" {
+		nodeName = opts.Name
+	} else if opts.IPAddress != "" {
+		log.Debug("Looking up node by IP", opts.IPAddress)
+		node, err := cli.GetNodeByIP(opts.IPAddress)
+		if err != nil {
+			return err
+		}
+		nodeName = node.GetName()
+	}
+
+	if opts.Uninstall {
+		if opts.IPAddress == "" {
+			ip, err := cli.GetIPByNodeName(nodeName)
+			if err != nil {
+				return err
+			}
+			opts.NodeConnectOptions.Address = ip
+		} else {
+			opts.NodeConnectOptions.Address = opts.IPAddress
+		}
+	}
+
+	log.Info("Deleting node", nodeName)
+	if err := cli.RemoveNode(nodeName); err != nil {
+		return err
+	}
+
+	// Wait for the node to be deleted
+	log.Infof("Waiting for %q to be removed from the cluster\n", nodeName)
+	var failCount int
+ListNodesLoop:
+	for {
+		nodes, err := cli.ListNodes()
+		if err != nil {
+			if failCount > 3 {
+				return err
+			}
+			log.Debug("Failure while listing nodes, retrying - error:", err.Error())
+			failCount++
+			continue ListNodesLoop
+		}
+		failCount = 0
+		for _, node := range nodes {
+			if node.GetName() == nodeName {
+				log.Debug("Still waiting for node to be removed")
+				time.Sleep(time.Second)
+				continue ListNodesLoop
+			}
+		}
+		break ListNodesLoop
+	}
+
+	if opts.Uninstall {
+		log.Infof("Connecting to %s and uninstalling k3s\n", nodeName)
+		oldNode, err := node.Connect(opts.NodeConnectOptions)
+		if err != nil {
+			return err
+		}
+		return oldNode.Execute(&types.ExecuteOptions{
+			LogPrefix: "K3S",
+			Command:   "k3s-uninstall.sh", // TODO: type cast somewhere
+		})
+	}
+
+	return nil
+}
 
 func (m *manager) AddNode(newNode types.Node, opts *types.AddNodeOptions) error {
 

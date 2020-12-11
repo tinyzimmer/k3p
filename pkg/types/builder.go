@@ -37,7 +37,7 @@ type BuildOptions struct {
 	// A list of images to include in the package
 	Images []string
 	// The directory to scan for kubernetes manifests and helm charts
-	ManifestDir string
+	ManifestDirs []string
 	// Arguments to pass to helm charts bundled with the application
 	HelmArgs string
 	// A list of directories to exclude while searching for manifests

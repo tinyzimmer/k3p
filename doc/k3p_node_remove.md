@@ -1,16 +1,16 @@
-## k3p node add
+## k3p node remove
 
-Add a new node to the cluster
+Remove a node from the cluster by name or IP
 
 ```
-k3p node add NODE [flags]
+k3p node remove NODE [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help               help for add
-  -r, --node-role string   Whether to join the instance as a 'server' or 'agent' (default "agent")
+  -h, --help        help for remove
+      --uninstall   After the node is removed from the cluster, remote in and uninstall k3s
 ```
 
 ### Options inherited from parent commands

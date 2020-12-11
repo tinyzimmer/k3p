@@ -62,6 +62,9 @@ func LoadDockerCluster(name string) ([]*Docker, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(containers) == 0 {
+		return nil, fmt.Errorf("No cluster found with the name %s", name)
+	}
 	nodes := make([]*Docker, len(containers))
 	for i, container := range containers {
 		nodes[i] = &Docker{
@@ -71,6 +74,20 @@ func LoadDockerCluster(name string) ([]*Docker, error) {
 		}
 	}
 	return nodes, nil
+}
+
+// GetDockerClusterLeader returns the leader for the docker cluster of the given name.
+func GetDockerClusterLeader(name string) (*Docker, error) {
+	nodes, err := LoadDockerCluster(name)
+	if err != nil {
+		return nil, err
+	}
+	for _, dnode := range nodes {
+		if dnode.opts.NodeIndex == 0 && dnode.opts.NodeRole == types.K3sRoleServer {
+			return dnode, nil
+		}
+	}
+	return nil, fmt.Errorf("Could not locate the leader for cluster %s", name)
 }
 
 // DeleteDockerNetwork deletes a docker network with the given name
@@ -164,7 +181,7 @@ func buildDockerCmd(nodeOpts *types.DockerNodeOptions, opts *types.ExecuteOption
 	return strslice.StrSlice(cmd)
 }
 
-var portMapRegex = regexp.MustCompile("(?P<Role>[a-z]+)(?P<Slice>\\[(?P<Index>[0-9])\\])?")
+var portMapRegex = regexp.MustCompile(`(?P<Role>[a-z]+)(?P<Slice>\[(?P<Index>[0-9])\])?`)
 
 func parsePortMapping(opts *types.DockerNodeOptions, portMapping string) (exposedPorts map[nat.Port]struct{}, portBindings map[nat.Port][]nat.PortBinding) {
 	spl := strings.Split(portMapping, "@")

@@ -14,18 +14,20 @@ var (
 func init() {
 	uninstallCmd.Flags().StringVarP(&uninstallName, "name", "n", "", "The name of the package to uninstall (required for docker)")
 	if err := uninstallCmd.MarkFlagRequired("name"); err != nil {
-		log.Error(err)
+		log.Fatal(err)
 	}
-
-	uninstallCmd.RegisterFlagCompletionFunc("name", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		clusters, err := node.ListDockerClusters()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveDefault
-		}
-		return clusters, cobra.ShellCompDirectiveDefault
-	})
+	uninstallCmd.RegisterFlagCompletionFunc("name", completeClusters)
 
 	rootCmd.AddCommand(uninstallCmd)
+}
+
+func completeClusters(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	log.Verbose = false
+	clusters, err := node.ListDockerClusters()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+	return clusters, cobra.ShellCompDirectiveDefault
 }
 
 var uninstallCmd = &cobra.Command{
@@ -40,12 +42,10 @@ var uninstallCmd = &cobra.Command{
 			log.Info("No running clusters found for", uninstallName)
 			return nil
 		}
-		for _, node := range nodes {
-			defer node.Close()
-			if addr, err := node.GetK3sAddress(); err == nil { // it's always nil for docker
-				log.Info("Removing container and volumes for", addr)
-			}
-			if err := node.RemoveAll(); err != nil {
+		log.Info("Removing docker cluster", uninstallName)
+		for _, dockerNode := range nodes {
+			defer dockerNode.Close()
+			if err := dockerNode.RemoveAll(); err != nil {
 				return err
 			}
 		}

@@ -20,10 +20,9 @@ type Client interface {
 	RemoveNode(name string) error
 }
 
-// New returns a new Client for the k3s cluster. It is assumed to be called from the
-// master node (TODO: make this configurable).
-func New() (Client, error) {
-	config, err := clientcmd.BuildConfigFromFlags("", types.K3sKubeconfig)
+// New returns a new Client for the k3s cluster using the given kubeconfig bytes
+func New(cfg []byte) (Client, error) {
+	config, err := clientcmd.RESTConfigFromKubeConfig(cfg)
 	if err != nil {
 		return nil, err
 	}

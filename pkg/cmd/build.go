@@ -1,17 +1,20 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
-	"log"
+	"io/ioutil"
 	"os"
 	"path"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tinyzimmer/k3p/pkg/build"
 	"github.com/tinyzimmer/k3p/pkg/cache"
+	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 )
 
@@ -32,7 +35,7 @@ func init() {
 	buildCmd.Flags().StringVarP(&buildOpts.BuildVersion, "version", "V", types.VersionLatest, "The version to tag the package")
 	buildCmd.Flags().StringVar(&buildOpts.K3sVersion, "k3s-version", types.VersionLatest, "A specific k3s version to bundle with the package, overrides --channel")
 	buildCmd.Flags().StringVarP(&buildOpts.K3sChannel, "channel", "C", "stable", "The release channel to retrieve the version of k3s from")
-	buildCmd.Flags().StringVarP(&buildOpts.ManifestDir, "manifests", "m", cwd, "The directory to scan for kubernetes manifests and charts, defaults to the current directory")
+	buildCmd.Flags().StringArrayVarP(&buildOpts.ManifestDirs, "manifests", "m", []string{cwd}, "Directories to scan for kubernetes manifests and charts, defaults to the current directory, can be specified multiple times")
 	buildCmd.Flags().StringVarP(&buildOpts.HelmArgs, "helm-args", "H", "", "Arguments to pass to the 'helm template' command when searching for images")
 	buildCmd.Flags().StringSliceVarP(&buildOpts.Excludes, "exclude", "e", []string{}, "Directories to exclude when reading the manifest directory")
 	buildCmd.Flags().StringVarP(&buildOpts.Arch, "arch", "a", runtime.GOARCH, "The architecture to package the distribution for. Only (amd64, arm, and arm64 are supported)")
@@ -48,12 +51,9 @@ func init() {
 	buildCmd.MarkFlagDirname("exclude")
 	buildCmd.MarkFlagDirname("manifests")
 	buildCmd.MarkFlagFilename("config", "json", "yaml", "yml")
-	buildCmd.RegisterFlagCompletionFunc("pull-policy", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{string(types.PullPolicyAlways), string(types.PullPolicyIfNotPresent), string(types.PullPolicyNever)}, cobra.ShellCompDirectiveDefault
-	})
-	buildCmd.RegisterFlagCompletionFunc("arch", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"amd64", "arm64", "arm"}, cobra.ShellCompDirectiveDefault
-	})
+	buildCmd.RegisterFlagCompletionFunc("pull-policy", completeStringOpts([]string{string(types.PullPolicyAlways), string(types.PullPolicyIfNotPresent), string(types.PullPolicyNever)}))
+	buildCmd.RegisterFlagCompletionFunc("arch", completeStringOpts([]string{"amd64", "arm64", "arm"}))
+	buildCmd.RegisterFlagCompletionFunc("channel", completeChannels)
 
 	rootCmd.AddCommand(buildCmd)
 }
@@ -79,4 +79,34 @@ var buildCmd = &cobra.Command{
 		}
 		return builder.Build(buildOpts)
 	},
+}
+
+type channelResponse struct {
+	Data []channel `json:"data"`
+}
+
+type channel struct {
+	ID string `json:"id"`
+}
+
+func completeChannels(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	log.Verbose = false
+	var res channelResponse
+	resp, err := cache.DefaultCache.GetIfOlder("https://update.k3s.io/v1-release/channels", time.Hour*24)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+	defer resp.Close()
+	body, err := ioutil.ReadAll(resp)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+	if err := json.Unmarshal(body, &res); err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+	out := make([]string, len(res.Data))
+	for i, channel := range res.Data {
+		out[i] = channel.ID
+	}
+	return out, cobra.ShellCompDirectiveDefault
 }

@@ -246,6 +246,9 @@ func (d *Docker) WriteFile(rdr io.ReadCloser, destination string, mode string, s
 // as arguments to run K3s with. It's because of this implementation that this method should probably be
 // renamed.
 func (d *Docker) Execute(opts *types.ExecuteOptions) error {
+	if opts.Command == "k3s-uninstall.sh" { // TODO: type cast this somewhere
+		return d.RemoveAll()
+	}
 	log.Info("Starting k3s docker node", d.opts.GetNodeName())
 	// Assume being called to start K3s if a server or agent, first remove busybox container
 	if d.opts.NodeRole != types.K3sRoleLoadBalancer {
@@ -288,6 +291,9 @@ func (d *Docker) Close() error { return d.cli.Close() }
 // RemoveAll is a special method implemented by the Docker object. It cleans up the container
 // and all its resources.
 func (d *Docker) RemoveAll() error {
+	if addr, err := d.GetK3sAddress(); err == nil { // it's always nil for docker
+		log.Info("Removing docker container and volumes for", addr)
+	}
 	if err := d.cli.ContainerRemove(context.TODO(), d.containerID, dockertypes.ContainerRemoveOptions{
 		Force:         true,
 		RemoveVolumes: true,
@@ -310,3 +316,6 @@ func (d *Docker) IsK3sRunning() bool {
 	}
 	return strings.HasSuffix(status.Config.Entrypoint[0], "k3s") && status.State.Running
 }
+
+// GetOpts returns the options that were used to configure this node.
+func (d *Docker) GetOpts() *types.DockerNodeOptions { return d.opts }

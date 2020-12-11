@@ -137,14 +137,17 @@ func (p *ManifestParser) packageHelmChartToArtifacts(chartPath string) ([]*types
 		chartPkg := path.Join(tmpDir, files[0].Name())
 		packagedChartName = path.Base(files[0].Name())
 		packagedChartBytes, err = ioutil.ReadFile(chartPkg)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		// Chart is already packaged
 		log.Debugf("Chart at %q is already packaged, adding directly to manifest\n", chartPath)
 		packagedChartName = path.Base(chartPath)
 		packagedChartBytes, err = ioutil.ReadFile(chartPath)
-	}
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	stripExt := strings.TrimSuffix(path.Base(chartPath), ".tgz")

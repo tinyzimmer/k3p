@@ -82,7 +82,7 @@ func SyncPackageToNode(target types.Node, pkg types.Package, vars map[string]str
 	if len(meta.Manifest.Scripts) > 0 {
 		log.Info("Installing scripts to", types.K3sScriptsDir)
 		for _, script := range meta.Manifest.Scripts {
-			if err := writePkgFileToNode(target, pkg, types.ArtifactScript, path.Base(script), types.K3sBinDir, "0755", vars); err != nil {
+			if err := writePkgFileToNode(target, pkg, types.ArtifactScript, path.Base(script), types.K3sScriptsDir, "0755", vars); err != nil {
 				return err
 			}
 		}

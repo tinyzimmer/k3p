@@ -16,6 +16,7 @@ type NodeConnectOptions struct {
 
 // AddNodeOptions represents options passed to the AddNode operation.
 type AddNodeOptions struct {
+	// Options for remote connections
 	*NodeConnectOptions
 	// The role to assign the new node.
 	NodeRole K3sRole
@@ -23,10 +24,14 @@ type AddNodeOptions struct {
 
 // RemoveNodeOptions are options passed to a RemoveNode operation (not implemented).
 type RemoveNodeOptions struct {
+	// Options for remote connections
 	*NodeConnectOptions
+	// Attempt to remote into the system and uninstall k3s
 	Uninstall bool
-	Name      string
-	IPAddess  string
+	// The name of the node to remove
+	Name string
+	// The IP address of the node to remove
+	IPAddress string
 }
 
 // ClusterManager is an interface for managing the nodes in a k3s cluster.

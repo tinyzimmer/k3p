@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/user"
 	"path"
@@ -17,13 +18,17 @@ import (
 )
 
 var (
-	nodeAddRole         string
-	nodeAddRemoteLeader string
-	nodeAddOpts         *types.AddNodeOptions
+	nodeAddRole      string
+	nodeRemoteLeader string
+	nodeConnectOpts  *types.NodeConnectOptions
+	nodeAddOpts      *types.AddNodeOptions
+	nodeRemoveOpts   *types.RemoveNodeOptions
 )
 
 func init() {
-	nodeAddOpts = &types.AddNodeOptions{NodeConnectOptions: &types.NodeConnectOptions{}}
+	nodeConnectOpts = &types.NodeConnectOptions{}
+	nodeAddOpts = &types.AddNodeOptions{}
+	nodeRemoveOpts = &types.RemoveNodeOptions{}
 
 	u, err := user.Current()
 	if err != nil {
@@ -36,22 +41,24 @@ func init() {
 		defaultKeyArg = defaultKeyPath
 	}
 
-	nodesAddCmd.Flags().StringVarP(&nodeAddOpts.SSHUser, "ssh-user", "u", u.Username, "The remote user to use for SSH authentication")
-	nodesAddCmd.Flags().StringVarP(&nodeAddOpts.SSHKeyFile, "private-key", "k", defaultKeyArg, "A private key to use for SSH authentication, if not provided you will be prompted for a password")
-	nodesAddCmd.Flags().IntVarP(&nodeAddOpts.SSHPort, "ssh-port", "p", 22, "The port to use when connecting to the remote instance over SSH")
-	nodesAddCmd.Flags().StringVarP(&nodeAddRole, "node-role", "r", string(types.K3sRoleAgent), "Whether to join the instance as a 'server' or 'agent'")
-	nodesAddCmd.Flags().StringVarP(&nodeAddRemoteLeader, "leader", "L", "", `The IP address or DNS name of the leader of the cluster.
+	nodesCmd.PersistentFlags().StringVarP(&nodeConnectOpts.SSHUser, "ssh-user", "u", u.Username, "The remote user to use for SSH authentication")
+	nodesCmd.PersistentFlags().StringVarP(&nodeConnectOpts.SSHKeyFile, "private-key", "k", defaultKeyArg, "A private key to use for SSH authentication, if not provided you will be prompted for a password")
+	nodesCmd.PersistentFlags().IntVarP(&nodeConnectOpts.SSHPort, "ssh-port", "p", 22, "The port to use when connecting to the remote instance over SSH")
+	nodesCmd.PersistentFlags().StringVarP(&nodeRemoteLeader, "leader", "L", "", `The IP address or DNS name of the leader of the cluster.
 
 When left unset, the machine running k3p is assumed to be the leader of the cluster. Otherwise,
-the provided host is remoted into, with the same connection options as for the new node, to retrieve
-the installation manifest.
+the provided host is remoted into, with the same connection options as for the new node in case 
+of an add, to retrieve the installation manifest.
 `)
 
-	nodesAddCmd.RegisterFlagCompletionFunc("node-role", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"server", "agent"}, cobra.ShellCompDirectiveDefault
-	})
+	nodesAddCmd.Flags().StringVarP(&nodeAddRole, "node-role", "r", string(types.K3sRoleAgent), "Whether to join the instance as a 'server' or 'agent'")
+	nodesAddCmd.RegisterFlagCompletionFunc("node-role", completeStringOpts([]string{"server", "agent"}))
+
+	nodesRemoveCmd.Flags().BoolVar(&nodeRemoveOpts.Uninstall, "uninstall", false, "After the node is removed from the cluster, remote in and uninstall k3s")
 
 	nodesCmd.AddCommand(nodesAddCmd)
+	nodesCmd.AddCommand(nodesRemoveCmd)
+
 	rootCmd.AddCommand(nodesCmd)
 }
 
@@ -64,47 +71,86 @@ var nodesAddCmd = &cobra.Command{
 	Use:   "add NODE [flags]",
 	Short: "Add a new node to the cluster",
 	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		nodeAddOpts.Address = args[0]
+	RunE:  addNode,
+}
 
-		switch types.K3sRole(nodeAddRole) {
-		case types.K3sRoleServer:
-			nodeAddOpts.NodeRole = types.K3sRoleServer
-		case types.K3sRoleAgent:
-			nodeAddOpts.NodeRole = types.K3sRoleAgent
-		default:
-			return fmt.Errorf("%q is not a valid node role", nodeAddRole)
-		}
+var nodesRemoveCmd = &cobra.Command{
+	Use:   "remove NODE [flags]",
+	Short: "Remove a node from the cluster by name or IP",
+	Args:  cobra.ExactArgs(1),
+	RunE:  removeNode,
+}
 
-		if nodeAddOpts.SSHKeyFile == "" {
-			fmt.Printf("Enter SSH Password for %s: ", nodeAddOpts.SSHUser)
-			bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
-			if err != nil {
-				return err
-			}
-			nodeAddOpts.SSHPassword = string(bytePassword)
-		}
+func addNode(cmd *cobra.Command, args []string) error {
+	nodeAddOpts.NodeConnectOptions = nodeConnectOpts
+	nodeAddOpts.Address = args[0]
 
-		var leader types.Node
-		var err error
-		if nodeAddRemoteLeader != "" {
-			connectOpts := *nodeAddOpts.NodeConnectOptions
-			connectOpts.Address = nodeAddRemoteLeader
-			log.Infof("Connecting to %s:%d\n", connectOpts.Address, connectOpts.SSHPort)
-			leader, err = node.Connect(&connectOpts)
-			if err != nil {
-				return err
-			}
-		} else {
-			leader = node.Local()
-		}
+	switch types.K3sRole(nodeAddRole) {
+	case types.K3sRoleServer:
+		nodeAddOpts.NodeRole = types.K3sRoleServer
+	case types.K3sRoleAgent:
+		nodeAddOpts.NodeRole = types.K3sRoleAgent
+	default:
+		return fmt.Errorf("%q is not a valid node role", nodeAddRole)
+	}
 
-		log.Infof("Connecting to %s:%d\n", nodeAddOpts.Address, nodeAddOpts.SSHPort)
-		newNode, err := node.Connect(nodeAddOpts.NodeConnectOptions)
+	if nodeAddOpts.SSHKeyFile == "" {
+		fmt.Printf("Enter SSH Password for %s: ", nodeAddOpts.SSHUser)
+		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
 		if err != nil {
 			return err
 		}
+		nodeAddOpts.SSHPassword = string(bytePassword)
+	}
 
-		return cluster.New(leader).AddNode(newNode, nodeAddOpts)
-	},
+	leader, err := getLeader(nodeAddOpts.Address)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("Connecting to %s:%d\n", nodeAddOpts.Address, nodeAddOpts.SSHPort)
+	newNode, err := node.Connect(nodeAddOpts.NodeConnectOptions)
+	if err != nil {
+		return err
+	}
+
+	return cluster.New(leader).AddNode(newNode, nodeAddOpts)
+}
+
+func removeNode(cmd *cobra.Command, args []string) error {
+	if nodeRemoteLeader != "" && nodeConnectOpts.SSHKeyFile == "" {
+		fmt.Printf("Enter SSH Password for %s: ", nodeAddOpts.SSHUser)
+		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+		if err != nil {
+			return err
+		}
+		nodeConnectOpts.SSHPassword = string(bytePassword)
+	}
+	nodeRemoveOpts.NodeConnectOptions = nodeConnectOpts
+
+	target := args[0]
+	if ip := net.ParseIP(target); ip != nil {
+		// Valid IP address
+		nodeRemoveOpts.IPAddress = target
+	} else {
+		// Assume it's a node name
+		nodeRemoveOpts.Name = target
+	}
+
+	leader, err := getLeader(target)
+	if err != nil {
+		return err
+	}
+
+	return cluster.New(leader).RemoveNode(nodeRemoveOpts)
+}
+
+func getLeader(nodeName string) (types.Node, error) {
+	if nodeRemoteLeader != "" {
+		connectOpts := *nodeConnectOpts
+		connectOpts.Address = nodeRemoteLeader
+		log.Infof("Connecting to %s:%d\n", connectOpts.Address, connectOpts.SSHPort)
+		return node.Connect(&connectOpts)
+	}
+	return node.Local(), nil
 }

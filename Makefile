@@ -24,7 +24,7 @@ $(BIN):
 
 PKG_ARGS ?=
 $(PACKAGE): $(BIN)
-	$(BIN) build -o $(PACKAGE) --name k3p-test $(PKG_ARGS)
+	$(BIN) build -o $(PACKAGE) --name k3p-test --config example-manifests/config.yaml $(PKG_ARGS)
 
 docs:
 	go run hack/docgen.go
@@ -59,7 +59,7 @@ test: $(GINKGO)
 # and NODES variables in your environment and probably make use of these functions
 # as well.
 NODE_USER ?= core
-NODES ?= 172.17.113.136 172.17.113.137 172.17.113.130
+NODES ?= 172.18.64.84 172.18.64.90 172.18.64.91
 
 # Gets node by index: Usage $(call get-node,1)
 get-node = $(word $1,$(NODES))
@@ -89,14 +89,14 @@ deploy: $(BIN) $(PACKAGE) dist-node-1
 
 # ha-local will install an HA cluster, executing all commands from the local machine
 ha-local: $(BIN) $(PACKAGE)
-	$(BIN) install $(PACKAGE) --verbose --host=$(call get-node,1) --ssh-user=core --init-ha
+	$(BIN) install $(PACKAGE) --verbose --host=$(call get-node,1) --ssh-user=core --init-ha --set DNS_NAME=localhost
 	sleep 10
 	$(BIN) node add $(call get-node,2) --verbose --leader=$(call get-node,1) --ssh-user=core --node-role=server
 	$(BIN) node add $(call get-node,3) --verbose --leader=$(call get-node,1) --ssh-user=core --node-role=server
 
 # ha-remote will install an HA cluster, executing all commands from the leader machine
 ha-remote: $(BIN) $(PACKAGE) dist-node-1
-	$(MAKE) node-shell-1 CMD="sudo k3p install dist/package.tar --init-ha -v"
+	$(MAKE) node-shell-1 CMD="sudo k3p install dist/package.tar --init-ha --set DNS_NAME=localhost -v"
 	sleep 10
 	$(MAKE) node-shell-1 CMD="sudo k3p node add $(call get-node,2) --node-role=server --ssh-user=core --private-key=/var/home/core/.ssh/id_rsa -v"
 	$(MAKE) node-shell-1 CMD="sudo k3p node add $(call get-node,3) --node-role=server --ssh-user=core --private-key=/var/home/core/.ssh/id_rsa -v"
@@ -104,13 +104,13 @@ ha-remote: $(BIN) $(PACKAGE) dist-node-1
 # ha-cluster will install an HA cluster the traditional way by executing the install command
 # on each node.
 ha-cluster: $(BIN) $(PACKAGAE) dist-all-nodes
-	$(MAKE) node-shell-1 CMD="sudo k3p install dist/package.tar --init-ha -v"
+	$(MAKE) node-shell-1 CMD="sudo k3p install dist/package.tar --init-ha --set DNS_NAME=localhost -v"
 	sleep 10
 	$(MAKE) ha-join-2
 	$(MAKE) ha-join-3
 
 ha-join-%:
-	$(MAKE) node-shell-$* CMD='sudo k3p install dist/package.tar --verbose --join=https://$(call get-node,1):6443 --join-role=server --join-token="$(call get-server-token)"'
+	$(MAKE) node-shell-$* CMD='sudo k3p install dist/package.tar --verbose --join=https://$(call get-node,1):6443 --join-role=server --join-token="$(call get-server-token)" --set DNS_NAME=localhost'
 
 # Runs all the different dev flows to make sure nothing serious broke
 # Once I add docker functionality (e.g. deploy a package to local containers), this can be used

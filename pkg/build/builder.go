@@ -59,26 +59,28 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 		return err
 	}
 
-	parser := parser.NewManifestParser(opts.ManifestDir, opts.Excludes, opts.HelmArgs)
+	for _, dir := range opts.ManifestDirs {
+		parser := parser.NewManifestParser(dir, opts.Excludes, opts.HelmArgs)
 
-	log.Info("Searching for kubernetes manifests to include in the archive")
-	manifests, err := parser.ParseManifests()
-	if err != nil {
-		return err
-	}
-	for _, manifest := range manifests {
-		if err := b.writer.Put(manifest); err != nil {
+		log.Infof("Searching %q for kubernetes manifests to include in the archive\n", dir)
+		manifests, err := parser.ParseManifests()
+		if err != nil {
 			return err
 		}
-	}
-
-	if !opts.ExcludeImages {
-		log.Info("Parsing kubernetes manifests for container images to download")
-		if err := b.bundleImages(opts, parser); err != nil {
-			return err
+		for _, manifest := range manifests {
+			if err := b.writer.Put(manifest); err != nil {
+				return err
+			}
 		}
-	} else {
-		log.Info("Skipping bundling container images with the package")
+
+		if !opts.ExcludeImages {
+			log.Info("Parsing discovered manifests for container images to download")
+			if err := b.bundleImages(opts, parser); err != nil {
+				return err
+			}
+		} else {
+			log.Info("Skipping bundling container images with the package")
+		}
 	}
 
 	if opts.EULAFile != "" {
@@ -123,6 +125,7 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 		return err
 	}
 	log.Debugf("Complete package meta: %+v\n", b.writer.GetMeta())
+	log.Debugf("Complete package manifest: %+v\n", *b.writer.GetMeta().Manifest)
 
 	log.Infof("Archiving version %q of %q to %q\n", opts.BuildVersion, opts.Name, opts.Output)
 	archive, err := b.writer.Archive()

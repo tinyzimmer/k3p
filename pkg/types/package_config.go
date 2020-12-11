@@ -57,5 +57,5 @@ func PackageConfigFromFile(path string) (*PackageConfig, error) {
 	} else {
 		return nil, fmt.Errorf("%s is not a valid yaml or json file", path)
 	}
-	return &cfg, nil
+	return &cfg, err
 }

@@ -10,6 +10,7 @@ import (
 	"os/user"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/util"
@@ -49,6 +50,10 @@ type HTTPCache interface {
 	// Get retrieves the given URL from the cache, or the remote server if it
 	// isn't already present locally.
 	Get(url string) (io.ReadCloser, error)
+	// GetIfOlder retrieves the given URL from the cache, or the remote server
+	// if it isn't already present locally OR the provided duration since now
+	// has expired.
+	GetIfOlder(url string, dur time.Duration) (io.ReadCloser, error)
 	// Clean will wipe the contents of the cache.
 	Clean() error
 }
@@ -76,7 +81,7 @@ func (h *httpCache) Clean() error {
 	return os.RemoveAll(h.cacheDir)
 }
 
-func (h *httpCache) Get(url string) (io.ReadCloser, error) {
+func (h *httpCache) GetIfOlder(url string, dur time.Duration) (io.ReadCloser, error) {
 	// If cache is setup check it first
 	if !NoCache && h.cacheDir != "" {
 		log.Debugf("Checking local cache for the contents of %q\n", url)
@@ -86,12 +91,23 @@ func (h *httpCache) Get(url string) (io.ReadCloser, error) {
 		}
 		cachePath := path.Join(h.cacheDir, cacheName)
 		if fileExists(cachePath) {
-			log.Debug("Serving request from local cache")
-			return os.Open(cachePath)
+			if dur > 0 {
+				stat, err := os.Stat(cachePath)
+				if err != nil {
+					return nil, err
+				}
+				if stat.ModTime().Add(dur).After(time.Now()) {
+					return os.Open(cachePath)
+				}
+			} else {
+				log.Debugf("Serving request from local cached item %q\n", cachePath)
+				return os.Open(cachePath)
+			}
 		}
 	}
 
 	// We need to download the file
+	log.Debug("Performing HTTP GET to", url)
 	resp, err := h.get(url)
 	if err != nil {
 		return nil, err
@@ -111,12 +127,13 @@ func (h *httpCache) Get(url string) (io.ReadCloser, error) {
 	defer resp.Body.Close()
 
 	// We have a local cache, save the object for future use
+	log.Debug("Calculating filename for new cache object")
 	cacheName, err := util.CalculateSHA256Sum(strings.NewReader(url))
 	if err != nil {
 		return nil, err
 	}
 	cachePath := path.Join(h.cacheDir, cacheName)
-	log.Debugf("Writing %q to %q", url, cachePath)
+	log.Debugf("Writing %q to %q\n", url, cachePath)
 	f, err := os.OpenFile(cachePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return nil, err
@@ -126,6 +143,10 @@ func (h *httpCache) Get(url string) (io.ReadCloser, error) {
 	}
 
 	return out, nil
+}
+
+func (h *httpCache) Get(url string) (io.ReadCloser, error) {
+	return h.GetIfOlder(url, -1)
 }
 
 func fileExists(path string) bool {
