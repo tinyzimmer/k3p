@@ -80,10 +80,28 @@ func (l *localNode) GetK3sAddress() (string, error) {
 	return getExternalK3sAddr()
 }
 
-var procK3sPort = strings.ToUpper(strconv.FormatInt(6443, 16))
 var procLocalhost = strings.ToUpper(pack32BinaryIP4("1.0.0.127"))
 
 func getExternalK3sAddr() (addr string, err error) {
+	possibleAddrs := make([]net.IP, 0)
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "", err
+	}
+	for _, a := range addrs {
+		var ip net.IP
+		switch v := a.(type) {
+		case *net.IPNet:
+			ip = v.IP
+		case *net.IPAddr:
+			ip = v.IP
+		}
+		if !ip.IsLoopback() {
+			log.Debug("Found potential k3s IP", ip)
+			possibleAddrs = append(possibleAddrs, ip)
+		}
+	}
+	log.Debug("Possible API addresses:", possibleAddrs)
 	procs, err := ps.Processes()
 	if err != nil {
 		return "", err
@@ -112,17 +130,32 @@ func getExternalK3sAddr() (addr string, err error) {
 			if len(spl) < 2 {
 				return "", errors.New("Unexpected error reading proc file, addr doesn't have two parts")
 			}
-			addrHex, portHex := spl[0], spl[1]
+			addrHex := spl[0]
 			if procLocalhost == addrHex {
 				continue
 			}
-			if portHex == procK3sPort {
+			if isPossibleAddr(possibleAddrs, addrHex) {
+				log.Debug("K3s appears to be listening on addr hex", addrHex)
 				return hexToIP(addrHex)
 			}
-
 		}
 	}
 	return "", errors.New("Could not determine k3s external address")
+}
+
+func isPossibleAddr(possible []net.IP, addrHex string) bool {
+	for _, p := range possible {
+		if ip4 := p.To4(); ip4 != nil {
+			if toIPHex(ip4) == addrHex {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func toIPHex(ip net.IP) string {
+	return strings.ToUpper(pack32BinaryIP4(fmt.Sprintf("%v.%v.%v.%v", ip[3], ip[2], ip[1], ip[0])))
 }
 
 func pack32BinaryIP4(ip4Address string) string {

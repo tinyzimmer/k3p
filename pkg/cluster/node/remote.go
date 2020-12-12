@@ -63,7 +63,9 @@ func (n *remoteNode) GetFile(path string) (io.ReadCloser, error) {
 		return nil, err
 	}
 	remoteRdr := &remoteReadCloser{sess: sess, pipe: outPipe}
-	if err := sess.Start(fmt.Sprintf("sudo cat %q", path)); err != nil {
+	cmd := fmt.Sprintf("sudo cat %q", path)
+	log.Debugf("Running command on %s: %s\n", n.remoteAddr, cmd)
+	if err := sess.Start(cmd); err != nil {
 		if cerr := sess.Close(); cerr != nil {
 			log.Error("Unexpected error while closing failed ssh get file:", cerr)
 		}
@@ -82,7 +84,7 @@ func (n *remoteNode) WriteFile(rdr io.ReadCloser, destination string, mode strin
 	}
 	defer scpClient.Close()
 	defer rdr.Close()
-	log.Debugf("Sending %d bytes of %q to %q and setting mode to %s\n", size, path.Base(destination), destination, mode)
+	log.Debugf("Sending %d bytes of %q to %q on %s and setting mode to %s\n", size, path.Base(destination), destination, n.remoteAddr, mode)
 	return scpClient.Copy(rdr, destination, mode, size)
 }
 
@@ -93,7 +95,7 @@ func (n *remoteNode) MkdirAll(dir string) error {
 	}
 	defer sess.Close()
 	cmd := fmt.Sprintf("sudo mkdir -p %s", dir)
-	log.Debug("Running command on remote:", cmd)
+	log.Debugf("Running command on %s: %s\n", n.remoteAddr, cmd)
 	return sess.Run(cmd)
 }
 
@@ -111,7 +113,7 @@ func (n *remoteNode) Execute(opts *types.ExecuteOptions) error {
 		return err
 	}
 	cmd := buildCmdFromExecOpts(opts)
-	log.Debug("Executing command on remote:", redactSecrets(cmd, opts.Secrets))
+	log.Debugf("Executing command on %s: %s\n", n.remoteAddr, redactSecrets(cmd, opts.Secrets))
 	go log.TailReader(opts.LogPrefix, outPipe)
 	go log.TailReader(opts.LogPrefix, errPipe)
 	return sess.Run(cmd)

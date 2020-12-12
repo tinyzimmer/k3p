@@ -1,6 +1,10 @@
 package types
 
-import "io"
+import (
+	"io"
+	"strconv"
+	"strings"
+)
 
 // NodeType represents a type of node
 type NodeType string
@@ -46,4 +50,28 @@ type ExecuteOptions struct {
 	LogPrefix string
 	// Secret strings to filter from any logging output
 	Secrets []string
+}
+
+// GetAPIPort returns the API port configured for these ExecuteOptions. This is a bit of a hack
+// for the fact that the user is allowed to pass in raw k3s exec strings. A lot of this needs to
+// be refactored.
+func (e *ExecuteOptions) GetAPIPort() int {
+	for k, v := range e.Env {
+		if k == "INSTALL_K3S_EXEC" {
+			fields := strings.Fields(v)
+			for idx, arg := range fields {
+				if strings.HasPrefix(arg, "--https-listen-port=") {
+					if port, err := strconv.Atoi(strings.TrimPrefix(arg, "--https-listen-port=")); err == nil {
+						return port
+					}
+				}
+				if arg == "--https-listen-port" {
+					if port, err := strconv.Atoi(fields[idx+1]); err == nil {
+						return port
+					}
+				}
+			}
+		}
+	}
+	return 6443
 }

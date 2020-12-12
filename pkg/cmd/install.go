@@ -69,6 +69,7 @@ func init() {
 	})
 
 	installCmd.Flags().StringVarP(&installOpts.NodeName, "node-name", "n", "", "An optional name to give this node in the cluster")
+	installCmd.Flags().IntVar(&installOpts.APIListenPort, "api-port", 6443, "The port for the k3s server to bind to")
 	installCmd.Flags().BoolVar(&installOpts.AcceptEULA, "accept-eula", false, "Automatically accept any EULA included with the package")
 	installCmd.Flags().StringVarP(&installOpts.ServerURL, "join", "j", "", "When installing an agent instance, the address of the server to join (e.g. https://myserver:6443)")
 	installCmd.Flags().StringVarP(&installNodeRole, "join-role", "r", "agent", `Specify whether to join the cluster as a "server" or "agent"`)
@@ -89,8 +90,11 @@ When used with the --host flag, the path must reside on the remote system (this 
 	installCmd.Flags().StringVar(&installWriteKubeconfig, "write-kubeconfig", "", "Write a copy of the admin client to this file")
 	installCmd.Flags().StringVar(&installOpts.KubeconfigMode, "kubeconfig-mode", "", "The mode to set on the k3s kubeconfig. Default is to only allow root access")
 
-	installCmd.Flags().StringVar(&installOpts.K3sExecArgs, "k3s-exec", "", `Extra arguments to pass to the k3s server or agent process, for more details see:
+	installCmd.Flags().StringArrayVar(&installOpts.K3sServerArgs, "k3s-server-arg", []string{}, `Extra arguments to pass to the k3s server process, for more details see:
 https://rancher.com/docs/k3s/latest/en/installation/install-options/server-config
+`)
+	installCmd.Flags().StringArrayVar(&installOpts.K3sAgentArgs, "k3s-agent-arg", []string{}, `Extra arguments to pass to the k3s agent process, for more details see:
+https://rancher.com/docs/k3s/latest/en/installation/install-options/agent-config
 `)
 	installCmd.Flags().BoolVar(&installOpts.InitHA, "init-ha", false, `When set, this server will run with the --cluster-init flag to enable clustering, 
 and a token will be generated for adding additional servers to the cluster with 
@@ -121,8 +125,7 @@ if not provided you will be prompted for a password`)
 	installCmd.Flags().StringVar(&installDockerOpts.ClusterName, "cluster-name", "", "DOCKER ONLY: Override the name of the cluster (defaults to the package name)")
 	installCmd.Flags().IntVar(&installDockerOpts.Servers, "servers", 1, "DOCKER ONLY: The number of servers to run in the cluster")
 	installCmd.Flags().IntVar(&installDockerOpts.Agents, "agents", 0, "DOCKER ONLY: The number of agents to run in the cluster")
-	installCmd.Flags().IntVar(&installDockerOpts.APIPort, "api-port", 6443, "DOCKER ONLY: The port to bind to the k3s API server")
-	installCmd.Flags().StringArrayVarP(&installDockerOpts.PortMappings, "publish", "p", []string{}, "DOCKER ONLY: Additional port mappings to apply to the leader node")
+	installCmd.Flags().StringArrayVarP(&installDockerOpts.PortMappings, "publish", "p", []string{}, "DOCKER ONLY: Additional port mappings in the same format as used for k3d")
 
 	rootCmd.AddCommand(installCmd)
 }
@@ -213,7 +216,7 @@ See the help below for additional information on available flags.
 
 		// If docker, add any extra nodes and configure the load balancer
 		if installDocker {
-			if err := setupDockerCluster(target); err != nil {
+			if err := setupDockerCluster(target, pkg); err != nil {
 				return err
 			}
 		}
@@ -367,14 +370,12 @@ GetKubeconfig:
 
 	if installConnectOpts.Address != "" {
 		kubeconfigStr = strings.Replace(kubeconfigStr, "127.0.0.1", installConnectOpts.Address, 1)
-	} else if installDocker {
-		kubeconfigStr = strings.Replace(kubeconfigStr, "127.0.0.1:6443", fmt.Sprintf("127.0.0.1:%d", installDockerOpts.APIPort), 1)
 	}
 	log.Infof("Writing the kubeconfig to %q\n", installWriteKubeconfig)
 	return ioutil.WriteFile(installWriteKubeconfig, []byte(kubeconfigStr), 0644)
 }
 
-func setupDockerCluster(leader types.Node) error {
+func setupDockerCluster(leader types.Node, pkg types.Package) error {
 	clusterManager := cluster.New(leader)
 	// Create additional servers
 	if installDockerOpts.Servers > 1 {
@@ -443,7 +444,7 @@ func setupDockerCluster(leader types.Node) error {
 		return err
 	}
 
-	return lb.Execute(&types.ExecuteOptions{})
+	return lb.Execute(installOpts.ToExecOpts(pkg.GetMeta().GetPackageConfig()))
 }
 
 func getPackage(path string) (types.Package, error) {

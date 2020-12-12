@@ -83,9 +83,12 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 
 	for _, dir := range opts.ManifestDirs {
 		var helmValues map[string]interface{}
-		if packageMeta.PackageConfig.HelmValues != nil {
-			helmValues = packageMeta.PackageConfig.HelmValues
+		if cfg := packageMeta.GetPackageConfig(); cfg != nil {
+			if cfg.HelmValues != nil {
+				helmValues = cfg.HelmValues
+			}
 		}
+
 		parser := parser.NewManifestParser(dir, opts.Excludes, helmValues)
 
 		log.Infof("Searching %q for kubernetes manifests to include in the archive\n", dir)
@@ -136,7 +139,9 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 	}
 	log.Debugf("Complete package meta: %+v\n", b.writer.GetMeta())
 	log.Debugf("Complete package manifest: %+v\n", *b.writer.GetMeta().GetManifest())
-	log.Debugf("Complete package config: %+v\n", *b.writer.GetMeta().GetPackageConfig())
+	if cfg := b.writer.GetMeta().GetPackageConfig(); cfg != nil {
+		log.Debugf("Complete package config: %+v\n", *cfg)
+	}
 	log.Infof("Archiving version %q of %q to %q\n", opts.BuildVersion, opts.Name, opts.Output)
 	archive, err := b.writer.Archive()
 	if err != nil {

@@ -27,8 +27,12 @@ type InstallOptions struct {
 	// Optionally override the default k3s kubeconfig mode (0600)
 	// It is a string so it can be passed directly as an env var
 	KubeconfigMode string
-	// Extra arguments to pass to the k3s server or agent process
-	K3sExecArgs string
+	// The port that the k3s API server should listen on
+	APIListenPort int
+	// Extra arguments to pass to the k3s server or agent process that are not included
+	// in the package.
+	K3sServerArgs []string
+	K3sAgentArgs  []string
 	// Whether to run with --cluster-init
 	InitHA bool
 	// Whether to run as a server or agent
@@ -36,6 +40,30 @@ type InstallOptions struct {
 	// Variables contain substitutions to perform on manifests before
 	// installing them to the system.
 	Variables map[string]string
+}
+
+// DeepCopy creates a copy of these installation options.
+func (opts *InstallOptions) DeepCopy() *InstallOptions {
+	newOpts := &InstallOptions{
+		NodeName:       opts.NodeName,
+		AcceptEULA:     opts.AcceptEULA,
+		ServerURL:      opts.ServerURL,
+		NodeToken:      opts.NodeToken,
+		ResolvConf:     opts.ResolvConf,
+		KubeconfigMode: opts.KubeconfigMode,
+		APIListenPort:  opts.APIListenPort,
+		K3sServerArgs:  make([]string, len(opts.K3sServerArgs)),
+		K3sAgentArgs:   make([]string, len(opts.K3sAgentArgs)),
+		InitHA:         opts.InitHA,
+		K3sRole:        opts.K3sRole,
+		Variables:      make(map[string]string),
+	}
+	copy(newOpts.K3sServerArgs, opts.K3sServerArgs)
+	copy(newOpts.K3sAgentArgs, opts.K3sAgentArgs)
+	for k, v := range opts.Variables {
+		newOpts.Variables[k] = v
+	}
+	return newOpts
 }
 
 // ToExecOpts converts these install options into execute options to pass to a
@@ -65,8 +93,13 @@ func (opts *InstallOptions) ToExecOpts(cfg *PackageConfig) *ExecuteOptions {
 		env["K3S_URL"] = opts.ServerURL
 	}
 
-	// These are the overrides provided by the user
-	execFields := strings.Fields(opts.K3sExecArgs)
+	var execFields []string
+	switch opts.K3sRole {
+	case K3sRoleServer, "":
+		execFields = append([]string{string(K3sRoleServer)}, opts.K3sServerArgs...)
+	case K3sRoleAgent:
+		execFields = append([]string{string(K3sRoleAgent)}, opts.K3sAgentArgs...)
+	}
 
 	// Build out an exec string from the configuration
 	if cfg != nil {
@@ -76,6 +109,10 @@ func (opts *InstallOptions) ToExecOpts(cfg *PackageConfig) *ExecuteOptions {
 		case K3sRoleAgent:
 			execFields = cfg.AgentArgs(execFields)
 		}
+	}
+
+	if opts.APIListenPort != 0 && opts.K3sRole != K3sRoleAgent {
+		execFields = append(execFields, fmt.Sprintf("--https-listen-port=%d", opts.APIListenPort))
 	}
 
 	if args := strings.Join(execFields, " "); args != "" {
@@ -89,7 +126,7 @@ func (opts *InstallOptions) ToExecOpts(cfg *PackageConfig) *ExecuteOptions {
 
 	return &ExecuteOptions{
 		Env:       env,
-		Command:   fmt.Sprintf("sh %q %s", path.Join(K3sScriptsDir, "install.sh"), string(opts.K3sRole)),
+		Command:   fmt.Sprintf("sh %q", path.Join(K3sScriptsDir, "install.sh")),
 		LogPrefix: "K3S",
 		Secrets:   secrets,
 	}

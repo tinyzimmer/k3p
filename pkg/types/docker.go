@@ -31,8 +31,6 @@ type DockerClusterOptions struct {
 	K3sVersion string
 	// The number of servers and agents to run in the cluster
 	Servers, Agents int
-	// The port on the host to bind the API to
-	APIPort int
 	// Additional port mappings to apply to the leader node
 	PortMappings []string
 }

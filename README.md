@@ -4,6 +4,11 @@ A `k3s` packager and installer, primarily intended for airgapped deployments
 
 For documentation on `k3p` usage, see the [command docs here](doc/k3p.md).
 
+## TODO:
+
+- API Port is hard coded in a lot of places, need to make `k3p install --api-port=` available across the board.
+- Per node configs
+
 ## Quickstart
 
 Will publish releases via actions in the future. For now, on a system with `git` and `go` installed.

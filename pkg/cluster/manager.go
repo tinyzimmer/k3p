@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"path"
 	"strings"
 	"time"
 
@@ -136,6 +135,8 @@ func (m *manager) AddNode(newNode types.Node, opts *types.AddNodeOptions) error 
 	if err != nil {
 		return err
 	}
+	defer f.Close()
+
 	pkg, err := v1.Load(f)
 	if err != nil {
 		return err
@@ -164,20 +165,19 @@ func (m *manager) AddNode(newNode types.Node, opts *types.AddNodeOptions) error 
 	}
 	tokenStr := strings.TrimSpace(string(token))
 
+	log.Debug("Loading installed package configuration")
 	var installedConfig types.InstallConfig
-	if cfg := pkg.GetMeta().GetPackageConfig(); cfg != nil {
-		f, err := m.leader.GetFile(types.InstalledConfigFile)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		body, err := ioutil.ReadAll(f)
-		if err != nil {
-			return err
-		}
-		if err := json.Unmarshal(body, &installedConfig); err != nil {
-			return err
-		}
+	cfgFile, err := m.leader.GetFile(types.InstalledConfigFile)
+	if err != nil {
+		return err
+	}
+	defer cfgFile.Close()
+	body, err := ioutil.ReadAll(cfgFile)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(body, &installedConfig); err != nil {
+		return err
 	}
 
 	if err := util.SyncPackageToNode(newNode, pkg, &installedConfig); err != nil {
@@ -185,20 +185,14 @@ func (m *manager) AddNode(newNode types.Node, opts *types.AddNodeOptions) error 
 	}
 
 	log.Infof("Joining instance as a new %s\n", opts.NodeRole)
-	execOpts := buildInstallOpts(&installedConfig, remoteAddr, tokenStr, string(opts.NodeRole))
+	execOpts := buildInstallOpts(pkg, &installedConfig, remoteAddr, tokenStr, opts.NodeRole)
 	return newNode.Execute(execOpts)
 }
 
-func buildInstallOpts(cfg *types.InstallConfig, remoteAddr, token, nodeRole string) *types.ExecuteOptions {
-	return &types.ExecuteOptions{
-		Env: map[string]string{
-			"INSTALL_K3S_SKIP_DOWNLOAD": "true",
-			"K3S_URL":                   fmt.Sprintf("https://%s:6443", remoteAddr),
-			"K3S_TOKEN":                 token,
-			"INSTALL_K3S_EXEC":          cfg.Env["INSTALL_K3S_EXEC"],
-		},
-		Command:   fmt.Sprintf("sh %s %s", path.Join(types.K3sScriptsDir, "install.sh"), nodeRole),
-		LogPrefix: "K3S",
-		Secrets:   []string{token},
-	}
+func buildInstallOpts(pkg types.Package, cfg *types.InstallConfig, remoteAddr, token string, nodeRole types.K3sRole) *types.ExecuteOptions {
+	opts := cfg.DeepCopy().InstallOptions
+	opts.ServerURL = fmt.Sprintf("https://%s:%d", remoteAddr, cfg.InstallOptions.APIListenPort)
+	opts.NodeToken = token
+	opts.K3sRole = nodeRole
+	return opts.ToExecOpts(pkg.GetMeta().GetPackageConfig())
 }

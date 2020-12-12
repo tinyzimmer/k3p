@@ -50,9 +50,10 @@ func (i *installer) Install(target types.Node, pkg types.Package, opts *types.In
 		}
 	}
 
+	execOpts := opts.ToExecOpts(pkg.GetMeta().GetPackageConfig())
 	if opts.InitHA {
 		// append --cluster-init
-		opts.K3sExecArgs = opts.K3sExecArgs + " --cluster-init"
+		execOpts.Env["INSTALL_K3S_EXEC"] = execOpts.Env["INSTALL_K3S_EXEC"] + " --cluster-init"
 		// Check if we need to generate an HA token
 		if opts.NodeToken == "" {
 			log.Info("Generating a node token for additional control-plane instances")
@@ -61,15 +62,13 @@ func (i *installer) Install(target types.Node, pkg types.Package, opts *types.In
 			if err := target.WriteFile(ioutil.NopCloser(strings.NewReader(token)), types.ServerTokenFile, "0600", 128); err != nil {
 				return err
 			}
-			opts.NodeToken = token
+			execOpts.Env["K3S_TOKEN"] = token
+			execOpts.Secrets = append(execOpts.Secrets, token)
 		}
 	}
 
-	execOpts := opts.ToExecOpts(pkg.GetMeta().GetPackageConfig())
-	installedConfig := &types.InstallConfig{
-		Variables: opts.Variables,
-		Env:       execOpts.Env,
-	}
+	installedConfig := &types.InstallConfig{InstallOptions: opts}
+	log.Debugf("Built installation config %+v\n", installedConfig)
 
 	// unpack the manifest onto the node
 	if err := util.SyncPackageToNode(target, pkg, installedConfig); err != nil {

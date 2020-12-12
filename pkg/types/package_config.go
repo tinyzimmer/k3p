@@ -196,27 +196,13 @@ func PackageConfigFromFile(path string) (*PackageConfig, error) {
 // InstallConfig represents the values that were collected at installation time. It is used
 // to serialize the configuration used to disk for future node-add/join operations.
 type InstallConfig struct {
-	// Variable substitutions
-	Variables map[string]string
-	// Environment configurations
-	Env map[string]string
+	// Options passed at installation
+	InstallOptions *InstallOptions
 }
 
 // DeepCopy creates a copy of this InstallConfig.
 func (i *InstallConfig) DeepCopy() *InstallConfig {
-	cfg := &InstallConfig{
-		Variables: make(map[string]string),
-		Env:       make(map[string]string),
+	return &InstallConfig{
+		InstallOptions: i.InstallOptions.DeepCopy(),
 	}
-	if len(i.Variables) > 0 {
-		for k, v := range i.Variables {
-			cfg.Variables[k] = v
-		}
-	}
-	if len(i.Env) > 0 {
-		for k, v := range i.Env {
-			cfg.Env[k] = v
-		}
-	}
-	return cfg
 }

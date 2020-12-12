@@ -144,7 +144,7 @@ func buildDockerEnv(nodeOpts *types.DockerNodeOptions, opts *types.ExecuteOption
 			servers = append(servers, serverOpts.GetNodeName())
 		}
 		out = append(out, fmt.Sprintf("SERVERS=%s", strings.Join(servers, ",")))
-		ports := []string{"6443"}
+		ports := []string{strconv.Itoa(opts.GetAPIPort())}
 		for _, port := range nodeOpts.ClusterOptions.PortMappings {
 			spl := strings.Split(port, "@")
 			if len(spl) == 1 || spl[len(spl)-1] == string(types.K3sRoleLoadBalancer) {
@@ -165,19 +165,26 @@ func buildDockerCmd(nodeOpts *types.DockerNodeOptions, opts *types.ExecuteOption
 	if nodeOpts.NodeRole == types.K3sRoleLoadBalancer {
 		return nil
 	}
-	fields := strings.Fields(opts.Command)
+
+	var nodeRole string
+	if exec := opts.Env["INSTALL_K3S_EXEC"]; exec != "" {
+		nodeRole = strings.Fields(exec)[0]
+	}
+
 	var cmd []string
-	switch fields[len(fields)-1] {
+	switch nodeRole {
 	case string(types.K3sRoleAgent):
 		cmd = []string{string(types.K3sRoleAgent)}
 	default:
 		cmd = []string{string(types.K3sRoleServer), "--tls-san", "0.0.0.0"}
 	}
+
 	for k, v := range opts.Env {
 		if k == "INSTALL_K3S_EXEC" {
-			cmd = append(cmd, strings.Fields(v)...)
+			cmd = append(cmd, strings.Fields(v)[1:]...)
 		}
 	}
+
 	return strslice.StrSlice(cmd)
 }
 
@@ -272,7 +279,8 @@ func translateOptsToConfigs(opts *types.DockerNodeOptions, execOpts *types.Execu
 			},
 		},
 	}
-	ports := append(opts.ClusterOptions.PortMappings, fmt.Sprintf("%d:6443/tcp@loadbalancer", opts.ClusterOptions.APIPort))
+	apiPort := execOpts.GetAPIPort()
+	ports := append(opts.ClusterOptions.PortMappings, fmt.Sprintf("%d:%d/tcp@loadbalancer", apiPort, apiPort))
 	for _, port := range ports {
 		exposedPorts, portBindings := parsePortMapping(opts, port)
 		for k, v := range exposedPorts {
