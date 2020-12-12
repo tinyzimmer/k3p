@@ -6,7 +6,6 @@ For documentation on `k3p` usage, see the [command docs here](doc/k3p.md).
 
 ## TODO:
 
-- API Port is hard coded in a lot of places, need to make `k3p install --api-port=` available across the board.
 - Per node configs
 
 ## Quickstart
