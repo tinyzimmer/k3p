@@ -50,16 +50,18 @@ func (p *ManifestParser) detectImagesFromHelmChart(chartPath string) ([]string, 
 	}
 
 	var helmVals chartutil.Values
-	if vals := p.GetHelmValues(chart.Name()); vals != nil {
-		raw, err := yaml.Marshal(p.HelmValues)
-		if err != nil {
-			return nil, err
+	if p.PackageConfig != nil {
+		if vals, ok := p.PackageConfig.HelmValues[chart.Name()]; ok {
+			raw, err := yaml.Marshal(vals)
+			if err != nil {
+				return nil, err
+			}
+			helmVals, err = chartutil.ReadValues(raw)
+			if err != nil {
+				return nil, err
+			}
+			log.Debugf("Using the following values for chart %q: %+v\n", chart.Name(), helmVals)
 		}
-		helmVals, err = chartutil.ReadValues(raw)
-		if err != nil {
-			return nil, err
-		}
-		log.Debugf("Using the following values for chart %q: %+v\n", chart.Name(), helmVals)
 	}
 
 	if err := chartutil.ProcessDependencies(chart, helmVals); err != nil {
@@ -115,13 +117,13 @@ func (p *ManifestParser) packageHelmChartToArtifacts(chartPath string) ([]*types
 	}
 
 	var valuesContent string
-	if vals := p.GetHelmValues(chart.Name()); vals != nil {
-		log.Debugf("Marshaling helm values for chart %q: %+v\n", chart.Name(), vals)
-		valuesBytes, err := yaml.Marshal(vals)
-		if err != nil {
-			return nil, err
+	if p.PackageConfig != nil {
+		rawValues, err := p.GetHelmValues(chart.Name())
+		if err == nil {
+			valuesContent = string(rawValues)
+		} else {
+			log.Debugf("Could not load helm values for chart %s: %s\n", chart.Name(), err.Error())
 		}
-		valuesContent = string(valuesBytes)
 	}
 
 	// package the chart to a temp file

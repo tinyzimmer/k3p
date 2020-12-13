@@ -11,8 +11,10 @@ import (
 	"os"
 	"path"
 	"strings"
+	"text/template"
 	"time"
 
+	"github.com/Masterminds/sprig"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 
@@ -206,4 +208,19 @@ func ArtifactFromReader(t types.ArtifactType, name string, rdr io.ReadCloser) (*
 			tmpDir: tmpDir, f: f,
 		},
 	}, nil
+}
+
+// RenderBody will render the given bytes with the provided variables.
+func RenderBody(body []byte, vars map[string]string) ([]byte, error) {
+	tmpl, err := template.New("").Funcs(sprig.TxtFuncMap()).Parse(string(body))
+	if err != nil {
+		return nil, err
+	}
+	var out bytes.Buffer
+	if err := tmpl.Execute(&out, map[string]interface{}{
+		"Vars": vars,
+	}); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
 }

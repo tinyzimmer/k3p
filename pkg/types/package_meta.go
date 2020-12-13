@@ -21,17 +21,22 @@ type PackageMeta struct {
 	Manifest *Manifest `json:"manifest,omitempty"`
 	// A configuration containing installation variables
 	PackageConfig *PackageConfig `json:"config,omitempty"`
+	// The raw, untemplated package config
+	PackageConfigRaw []byte `json:"configRaw,omitempty"`
 }
 
 // DeepCopy creates a copy of this PackageMeta instance.
+// TODO: DeepCopy functions need to be generated
 func (p *PackageMeta) DeepCopy() *PackageMeta {
 	meta := &PackageMeta{
-		MetaVersion: p.MetaVersion,
-		Name:        p.Name,
-		Version:     p.Version,
-		K3sVersion:  p.K3sVersion,
-		Arch:        p.Arch,
+		MetaVersion:      p.MetaVersion,
+		Name:             p.Name,
+		Version:          p.Version,
+		K3sVersion:       p.K3sVersion,
+		Arch:             p.Arch,
+		PackageConfigRaw: make([]byte, len(p.PackageConfigRaw)),
 	}
+	copy(meta.PackageConfigRaw, p.PackageConfigRaw)
 	if p.Manifest != nil {
 		meta.Manifest = p.Manifest.DeepCopy()
 	}
@@ -43,16 +48,17 @@ func (p *PackageMeta) DeepCopy() *PackageMeta {
 
 // Sanitize will iterate the PackageConfig and convert any `map[interface{}]interface{}`
 // to `map[string]interface{}`. This is required for serializing meta until I find a better
-// way to deal with helm values.
-func (p *PackageMeta) Sanitize() {
+// way to deal with helm values. For convenience, the pointer to the PackageMeta is returned.
+func (p *PackageMeta) Sanitize() *PackageMeta {
 	if p.PackageConfig == nil {
-		return
+		return p
 	}
 	newHelmValues := make(map[string]interface{})
 	for key, value := range p.PackageConfig.HelmValues {
 		newHelmValues[key] = sanitizeValue(value)
 	}
 	p.PackageConfig.HelmValues = newHelmValues
+	return p
 }
 
 func sanitizeValue(val interface{}) interface{} {
@@ -103,51 +109,4 @@ func (p *PackageMeta) GetPackageConfig() *PackageConfig { return p.PackageConfig
 // NewEmptyMeta returns a new empty PackageMeta instance.
 func NewEmptyMeta() *PackageMeta {
 	return &PackageMeta{Manifest: NewEmptyManifest()}
-}
-
-// Manifest contains the listings of all the files in the package.
-type Manifest struct {
-	// Binaries inside the package
-	Bins []string `json:"bins,omitempty"`
-	// Scripts inside the package
-	Scripts []string `json:"scripts,omitempty"`
-	// Images inside the package
-	Images []string `json:"images,omitempty"`
-	// Kubernetes manifests inside the package
-	K8sManifests []string `json:"k8sManifests,omitempty"`
-	// Static assets
-	Static []string `json:"static,omitempty"`
-	// The End User License Agreement for the package, or an empty string if there is none
-	EULA string `json:"eula,omitempty"`
-}
-
-// DeepCopy returns a copy of this Manifest.
-func (m *Manifest) DeepCopy() *Manifest {
-	out := &Manifest{
-		Bins:         make([]string, len(m.Bins)),
-		Scripts:      make([]string, len(m.Scripts)),
-		Images:       make([]string, len(m.Images)),
-		K8sManifests: make([]string, len(m.K8sManifests)),
-		Static:       make([]string, len(m.Static)),
-		EULA:         m.EULA,
-	}
-	copy(out.Bins, m.Bins)
-	copy(out.Scripts, m.Scripts)
-	copy(out.Images, m.Images)
-	copy(out.K8sManifests, m.K8sManifests)
-	copy(out.Static, m.Static)
-	return out
-}
-
-// HasEULA returns true if the manifest contains an end user license agreement.
-func (m *Manifest) HasEULA() bool { return m.EULA != "" }
-
-// NewEmptyManifest initializes a manifest with empty slices.
-func NewEmptyManifest() *Manifest {
-	return &Manifest{
-		Bins:         make([]string, 0),
-		Scripts:      make([]string, 0),
-		Images:       make([]string, 0),
-		K8sManifests: make([]string, 0),
-	}
 }

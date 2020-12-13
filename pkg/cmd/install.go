@@ -283,18 +283,17 @@ func gatherConfigVariables(cfg *types.PackageConfig) (map[string]string, error) 
 			}
 			var prompt string
 			if vari.Prompt != "" {
-				prompt = vari.Prompt + ": "
+				prompt = fmt.Sprintf("%s [%s]: ", vari.Prompt, vari.Default)
 			} else {
-				prompt = fmt.Sprintf("Please provide a value for %s: ", vari.Name)
+				prompt = fmt.Sprintf("Please provide a value for %s [%s]: ", vari.Name, vari.Default)
 			}
 			scanner := bufio.NewScanner(os.Stdin)
-			for {
-				fmt.Printf(prompt)
-				scanner.Scan()
-				if res := scanner.Text(); res != "" {
-					vars[vari.Name] = res
-					break
-				}
+			fmt.Printf(prompt)
+			scanner.Scan()
+			if res := scanner.Text(); res != "" {
+				vars[vari.Name] = res
+			} else {
+				vars[vari.Name] = vari.Default
 			}
 		}
 	}

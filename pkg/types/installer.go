@@ -131,3 +131,17 @@ func (opts *InstallOptions) ToExecOpts(cfg *PackageConfig) *ExecuteOptions {
 		Secrets:   secrets,
 	}
 }
+
+// InstallConfig represents the values that were collected at installation time. It is used
+// to serialize the configuration used to disk for future node-add/join operations.
+type InstallConfig struct {
+	// Options passed at installation
+	InstallOptions *InstallOptions
+}
+
+// DeepCopy creates a copy of this InstallConfig.
+func (i *InstallConfig) DeepCopy() *InstallConfig {
+	return &InstallConfig{
+		InstallOptions: i.InstallOptions.DeepCopy(),
+	}
+}

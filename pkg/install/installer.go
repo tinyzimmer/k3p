@@ -50,7 +50,15 @@ func (i *installer) Install(target types.Node, pkg types.Package, opts *types.In
 		}
 	}
 
-	execOpts := opts.ToExecOpts(pkg.GetMeta().GetPackageConfig())
+	cfg := pkg.GetMeta().DeepCopy().GetPackageConfig()
+	log.Debugf("Package configuration: %+v\n", cfg)
+	if cfg != nil {
+		if err := cfg.ApplyVariables(opts.Variables); err != nil {
+			return err
+		}
+	}
+	execOpts := opts.ToExecOpts(cfg)
+
 	if opts.InitHA {
 		// append --cluster-init
 		execOpts.Env["INSTALL_K3S_EXEC"] = execOpts.Env["INSTALL_K3S_EXEC"] + " --cluster-init"

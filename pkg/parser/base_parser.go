@@ -4,6 +4,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/tinyzimmer/k3p/pkg/types"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	corescheme "k8s.io/client-go/kubernetes/scheme"
@@ -15,14 +16,14 @@ import (
 // however in working towards a POC it made sense to keep things simple and combine raw and helm into a single
 // interface.
 type BaseManifestParser struct {
-	ParseDir     string
-	ExcludeDirs  []string
-	HelmValues   map[string]interface{}
-	Deserializer runtime.Decoder
+	ParseDir      string
+	ExcludeDirs   []string
+	PackageConfig *types.PackageConfig
+	Deserializer  runtime.Decoder
 }
 
 // NewBaseManifestParser returns a new base parser with the given arguments.
-func NewBaseManifestParser(parseDir string, excludeDirs []string, helmValues map[string]interface{}) *BaseManifestParser {
+func NewBaseManifestParser(parseDir string, excludeDirs []string, cfg *types.PackageConfig) *BaseManifestParser {
 	// create a new scheme
 	sch := runtime.NewScheme()
 
@@ -31,22 +32,20 @@ func NewBaseManifestParser(parseDir string, excludeDirs []string, helmValues map
 	_ = corescheme.AddToScheme(sch)
 
 	return &BaseManifestParser{
-		ParseDir:     parseDir,
-		ExcludeDirs:  excludeDirs,
-		HelmValues:   helmValues,
-		Deserializer: serializer.NewCodecFactory(sch).UniversalDeserializer(),
+		ParseDir:      parseDir,
+		ExcludeDirs:   excludeDirs,
+		PackageConfig: cfg,
+		Deserializer:  serializer.NewCodecFactory(sch).UniversalDeserializer(),
 	}
 }
 
 // GetParseDir returns the directory to be parsed for container images.
 func (b *BaseManifestParser) GetParseDir() string { return b.ParseDir }
 
-// GetHelmValues returns the helm values for the given chart if any, or nil if there are none.
-func (b *BaseManifestParser) GetHelmValues(chartName string) interface{} {
-	if vals, ok := b.HelmValues[chartName]; ok {
-		return vals
-	}
-	return nil
+// GetHelmValues returns the raw, untemplated helm values for a given chart. Or an error
+// if none can be found.
+func (b *BaseManifestParser) GetHelmValues(chartName string) ([]byte, error) {
+	return b.PackageConfig.RawHelmValuesForChart(chartName)
 }
 
 // StripParseDir is a convenience method for stripping the parse directory from the beginning

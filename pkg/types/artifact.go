@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"strings"
 )
 
 // Artifact represents an object to be placed or extracted from a bundle.
@@ -40,20 +39,17 @@ func (a *Artifact) Verify(sha256sum string) error {
 	return nil
 }
 
-// ApplyVariables will iterate the provided map and replace all instances of %{ KEY } with
-// the corresponding value.
+// ApplyVariables will template this artifact's body with the given variables.
 func (a *Artifact) ApplyVariables(vars map[string]string) error {
 	defer a.Body.Close()
 	body, err := ioutil.ReadAll(a.Body)
 	if err != nil {
 		return err
 	}
-	bodyStr := string(body)
-	for key, value := range vars {
-		search := fmt.Sprintf("%%{ %s }", key)
-		bodyStr = strings.Replace(bodyStr, search, value, -1)
+	body, err = render(body, vars)
+	if err != nil {
+		return err
 	}
-	body = []byte(bodyStr)
 	a.Body = ioutil.NopCloser(bytes.NewReader(body))
 	a.Size = int64(len(body))
 	return nil

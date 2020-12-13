@@ -185,14 +185,21 @@ func (m *manager) AddNode(newNode types.Node, opts *types.AddNodeOptions) error 
 	}
 
 	log.Infof("Joining instance as a new %s\n", opts.NodeRole)
-	execOpts := buildInstallOpts(pkg, &installedConfig, remoteAddr, tokenStr, opts.NodeRole)
+	execOpts, err := buildInstallOpts(pkg, &installedConfig, remoteAddr, tokenStr, opts.NodeRole)
+	if err != nil {
+		return err
+	}
 	return newNode.Execute(execOpts)
 }
 
-func buildInstallOpts(pkg types.Package, cfg *types.InstallConfig, remoteAddr, token string, nodeRole types.K3sRole) *types.ExecuteOptions {
+func buildInstallOpts(pkg types.Package, cfg *types.InstallConfig, remoteAddr, token string, nodeRole types.K3sRole) (*types.ExecuteOptions, error) {
 	opts := cfg.DeepCopy().InstallOptions
+	pkgConf := pkg.GetMeta().DeepCopy().Sanitize().GetPackageConfig()
+	if err := pkgConf.ApplyVariables(opts.Variables); err != nil {
+		return nil, err
+	}
 	opts.ServerURL = fmt.Sprintf("https://%s:%d", remoteAddr, cfg.InstallOptions.APIListenPort)
 	opts.NodeToken = token
 	opts.K3sRole = nodeRole
-	return opts.ToExecOpts(pkg.GetMeta().GetPackageConfig())
+	return opts.ToExecOpts(pkgConf), nil
 }

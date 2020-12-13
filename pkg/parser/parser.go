@@ -16,9 +16,9 @@ import (
 )
 
 // NewManifestParser returns an interface for parsing container images from the given directory.
-func NewManifestParser(parseDir string, excludeDirs []string, helmValues map[string]interface{}) types.ManifestParser {
+func NewManifestParser(parseDir string, excludeDirs []string, cfg *types.PackageConfig) types.ManifestParser {
 	return &ManifestParser{
-		BaseManifestParser: NewBaseManifestParser(parseDir, excludeDirs, helmValues),
+		BaseManifestParser: NewBaseManifestParser(parseDir, excludeDirs, cfg),
 	}
 }
 
@@ -34,6 +34,11 @@ type ManifestParser struct{ *BaseManifestParser }
 func (p *ManifestParser) ParseImages() ([]string, error) {
 	// Initialize a slice for images
 	images := make([]string, 0)
+
+	renderVars := make(map[string]string)
+	if p.PackageConfig != nil {
+		renderVars = p.PackageConfig.DefaultVars()
+	}
 
 	err := filepath.Walk(p.GetParseDir(), func(file string, info os.FileInfo, lastErr error) error {
 		// Check previous error first to avoid panic
@@ -83,7 +88,7 @@ func (p *ManifestParser) ParseImages() ([]string, error) {
 		}
 
 		// We have a yaml file, parse it for images
-		containerImages, err := p.parseFileForImages(file)
+		containerImages, err := p.parseFileForImages(file, renderVars)
 		if err != nil {
 			return err
 		}
@@ -107,6 +112,11 @@ func (p *ManifestParser) ParseImages() ([]string, error) {
 // to the bundle.
 func (p *ManifestParser) ParseManifests() ([]*types.Artifact, error) {
 	artifacts := make([]*types.Artifact, 0)
+
+	renderVars := make(map[string]string)
+	if p.PackageConfig != nil {
+		renderVars = p.PackageConfig.DefaultVars()
+	}
 
 	err := filepath.Walk(p.GetParseDir(), func(file string, info os.FileInfo, lastErr error) error {
 		// Check previous error first to avoid panic
@@ -154,6 +164,13 @@ func (p *ManifestParser) ParseManifests() ([]*types.Artifact, error) {
 		data, err := ioutil.ReadFile(file)
 		if err != nil {
 			return err
+		}
+
+		if len(renderVars) > 0 {
+			data, err = util.RenderBody(data, renderVars)
+			if err != nil {
+				return err
+			}
 		}
 
 		// iterate all the yaml objects in the file

@@ -7,6 +7,7 @@ For documentation on `k3p` usage, see the [command docs here](doc/k3p.md).
 ## TODO:
 
 - Per node configs
+- Docs
 
 ## Quickstart
 

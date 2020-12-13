@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/tinyzimmer/k3p/pkg/log"
+	"github.com/tinyzimmer/k3p/pkg/util"
 
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -14,11 +15,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (p *ManifestParser) parseFileForImages(file string) ([]string, error) {
+func (p *ManifestParser) parseFileForImages(file string, renderVars map[string]string) ([]string, error) {
 	images := make([]string, 0)
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(renderVars) > 0 {
+		data, err = util.RenderBody(data, renderVars)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// iterate all the yaml objects in the file

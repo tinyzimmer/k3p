@@ -3,7 +3,6 @@ package build
 import (
 	"io/ioutil"
 	"os"
-	"path"
 	"strings"
 
 	v1 "github.com/tinyzimmer/k3p/pkg/build/package/v1"
@@ -42,6 +41,16 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 		log.Infof("Building package %q\n", opts.Name)
 	}
 
+	if opts.K3sVersion == types.VersionLatest {
+		log.Info("Detecting latest k3s version for channel", opts.K3sChannel)
+		latest, err := getLatestK3sForChannel(opts.K3sChannel)
+		if err != nil {
+			return err
+		}
+		opts.K3sVersion = latest
+		log.Info("Latest k3s version is", opts.K3sVersion)
+	}
+
 	packageMeta := types.PackageMeta{
 		MetaVersion: "v1",
 		Name:        opts.Name,
@@ -57,20 +66,7 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 			return err
 		}
 		packageMeta.PackageConfig = conf
-		if err := packageMeta.PackageConfig.ExpandHelmValues(path.Dir(opts.ConfigFile)); err != nil {
-			return err
-		}
 		log.Debugf("Unmarshaled config: %+v\n", *packageMeta.PackageConfig)
-	}
-
-	if opts.K3sVersion == types.VersionLatest {
-		log.Info("Detecting latest k3s version for channel", opts.K3sChannel)
-		latest, err := getLatestK3sForChannel(opts.K3sChannel)
-		if err != nil {
-			return err
-		}
-		opts.K3sVersion = latest
-		log.Info("Latest k3s version is", opts.K3sVersion)
 	}
 
 	log.Infof("Packaging distribution for version %q using %q architecture\n", opts.K3sVersion, opts.Arch)
@@ -82,14 +78,8 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 	}
 
 	for _, dir := range opts.ManifestDirs {
-		var helmValues map[string]interface{}
-		if cfg := packageMeta.GetPackageConfig(); cfg != nil {
-			if cfg.HelmValues != nil {
-				helmValues = cfg.HelmValues
-			}
-		}
 
-		parser := parser.NewManifestParser(dir, opts.Excludes, helmValues)
+		parser := parser.NewManifestParser(dir, opts.Excludes, packageMeta.GetPackageConfig())
 
 		log.Infof("Searching %q for kubernetes manifests to include in the archive\n", dir)
 		manifests, err := parser.ParseManifests()

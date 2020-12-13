@@ -1,8 +1,34 @@
+variables:
+  - name: enableMetrics
+    default: "false"
+
+---
 serverConfig:
   disable: traefik
 
 helmValues:
+
+  kvdi:
+   vdi:
+    spec:
+      auth:
+        allowAnonymous: true
+      app:
+        auditLog: true
+      {{ if eq .Vars.enableMetrics "true" }}
+      metrics:
+        prometheus:
+          create: true
+        grafana:
+          enabled: true
+        serviceMonitor:
+          create: true
+          labels:
+            release: kube-prometheus-stack
+      {{ end }}
+  
   kube-prometheus-stack:
+    # JUST installs the operator
     defaultRules:
       create: false
     prometheus:
@@ -31,19 +57,3 @@ helmValues:
       enabled: false
     coreDns:
       enabled: false
-  kvdi:
-   vdi:
-    spec:
-      auth:
-        allowAnonymous: true
-      app:
-        auditLog: true
-      metrics:
-        prometheus:
-          create: true
-        grafana:
-          enabled: true
-        serviceMonitor:
-          create: true
-          labels:
-            release: kube-prometheus-stack

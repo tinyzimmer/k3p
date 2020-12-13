@@ -1,0 +1,10 @@
+variables:
+  - name: dnsName
+    default: "localhost"
+  - name: traefikDisabled
+    default: "false"
+---
+{{ if eq .Vars.traefikDisabled "true" }}
+serverConfig:
+  disable: traefik
+{{ end }}

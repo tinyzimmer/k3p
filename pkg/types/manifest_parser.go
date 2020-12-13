@@ -1,6 +1,6 @@
 package types
 
-// ManifestParser is an interface for extracting a list of images/manifests from a directory
+// ManifestParser is an interface for extracting a list of images/manifests from a directory.
 type ManifestParser interface {
 	// ParseImages should traverse the configured directories and search for container images
 	// to download.
