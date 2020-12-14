@@ -6,7 +6,8 @@ For documentation on `k3p` usage, see the [command docs here](doc/k3p.md).
 
 ## TODO:
 
-- Per node configs
+- Per node configs (can't decide if worth it)
+- Conditional helm charts?
 - Docs
 
 ## Quickstart

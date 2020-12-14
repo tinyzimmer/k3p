@@ -150,7 +150,7 @@ func PackageConfigFromReaderWithVars(rdr io.Reader, vars map[string]string) (*Pa
 }
 
 // reBlockStart is a regex matching the start of a root-level yaml block
-var reBlockStart = regexp.MustCompile("^[a-zA-Z0-9]")
+var reBlockStart = regexp.MustCompile(`^[^\s]`)
 
 // RawHelmValuesForChart will attempt to return the raw, untemplated helm values for the given chart.
 // TODO: The fact that this has to exist probably means I took a wrong turn somewhere.
@@ -181,7 +181,7 @@ func (p *PackageConfig) RawHelmValuesForChart(chartName string) ([]byte, error) 
 	// Scan everything until the next block matching the indent level of the chart name,
 	// or the end of the helm values block
 	var chartValues bytes.Buffer
-	re, err := regexp.Compile(fmt.Sprintf("^%s[a-zA-Z0-9]", indent))
+	re, err := regexp.Compile(fmt.Sprintf(`^%s[^\s]`, indent))
 
 	if err != nil {
 		return nil, err
