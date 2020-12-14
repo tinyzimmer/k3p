@@ -51,7 +51,7 @@ $(GOLANGCI_LINT):
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(GOLANGCI_VERSION)
 
 lint: $(GOLANGCI_LINT)
-	$(GOLANGCI_LINT) run -v
+	$(GOLANGCI_LINT) run -v --timeout 300s
 
 $(GINKGO):
 	GO111MODULE=off go get github.com/onsi/ginkgo/ginkgo
