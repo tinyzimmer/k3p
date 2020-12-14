@@ -37,7 +37,7 @@ jobs:
       run: make lint test
   
   build:
-    name: Test and build artifacts
+    name: Build artifacts
     runs-on: ubuntu-latest
     steps: 
 
