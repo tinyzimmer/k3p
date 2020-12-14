@@ -7,9 +7,21 @@ GOBIN ?= $(GOPATH)/bin
 GOLANGCI_VERSION ?= v1.33.0
 GOLANGCI_LINT ?= $(GOBIN)/golangci-lint
 GINKGO ?= $(GOBIN)/ginkgo
+GOX ?= $(GOBIN)/gox
 
 # Builds the k3p binary
 build: $(BIN)
+
+$(GOX):
+	GO111MODULE=off go get github.com/mitchellh/gox
+
+.PHONY: dist
+dist: $(GOX)
+	cd cmd/k3p && \
+		CGO_ENABLED=0 $(GOX) -os "linux windows" -arch "amd64 arm" --output "../../dist/{{.Dir}}_{{.OS}}_{{.Arch}}"
+	cd cmd/k3p && \
+		CGO_ENABLED=0 $(GOX) -os "darwin" -arch "amd64" --output "../../dist/{{.Dir}}_macOS_{{.Arch}}"
+
 
 install: $(BIN)
 	mkdir -p $(GOBIN)

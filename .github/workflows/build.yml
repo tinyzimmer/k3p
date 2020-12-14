@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  create:
+    tags:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+
+    - uses: actions/checkout@v1
+
+    - name: Run tests
+      run: make lint test
+  
+  build:
+    name: Build artifacts
+    runs-on: ubuntu-latest
+    steps: 
+    
+    - name: Build artifacts
+      run: make dist
+
+  publish:
+    name: Publish artifacts
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/upload-artifact@v2
+      with:
+        name: Publish latest artifacts
+        path: dist/
