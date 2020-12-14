@@ -1,8 +1,6 @@
 name: CI
 
 on:
-  create:
-    tags:
   push:
     branches: [ main ]
   pull_request:
