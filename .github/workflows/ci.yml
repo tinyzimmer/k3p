@@ -25,6 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     steps: 
     
+    - uses: actions/checkout@v1
+
     - name: Build artifacts
       run: make dist
 
