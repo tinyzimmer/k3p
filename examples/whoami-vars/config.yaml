@@ -4,7 +4,10 @@ variables:
   - name: traefikDisabled
     default: "false"
 ---
-{{ if eq .Vars.traefikDisabled "true" }}
 serverConfig:
-  disable: traefik
-{{ end }}
+  disable:
+    - local-storage
+    - metrics-server
+  {{- if eq .Vars.traefikDisabled "true" }}
+    - traefik
+  {{ end }}

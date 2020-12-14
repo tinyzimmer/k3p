@@ -29,12 +29,12 @@ type PackageConfig struct {
 	// the package and optionally overwritten by the user at installation. Any long-form flags accepted
 	// by k3s server without the leading "--" can be used as keys to Flags along with their cooresponding values.
 	// A list can be provided for the value to signal specifying the flag multiple times.
-	ServerConfig map[string]string `json:"serverConfig,omitempty" yaml:"serverConfig,omitempty"`
+	ServerConfig map[string]interface{} `json:"serverConfig,omitempty" yaml:"serverConfig,omitempty"`
 	// AgentConfig represents configurations to apply to k3s agent nodes. They can be bundled into
 	// the package and optionally overwritten by the user at installation. Any long-form flags accepted
 	// by k3s agent without the leading "--" can be used as keys to Flags along with their cooresponding values.
 	// A list can be provided for the value to signal specifying the flag multiple times.
-	AgentConfig map[string]string `json:"agentConfig,omitempty" yaml:"agentConfig,omitempty"`
+	AgentConfig map[string]interface{} `json:"agentConfig,omitempty" yaml:"agentConfig,omitempty"`
 	// HelmValues is a map of chart names to either a list of filenames containing values for that chart, or a single
 	// map of inline value declarations.
 	HelmValues map[string]interface{} `json:"helmValues,omitempty" yaml:"helmValues,omitempty"`
@@ -282,8 +282,8 @@ func flagKeyExists(fields []string, key string) bool {
 func (p *PackageConfig) DeepCopy() *PackageConfig {
 	out := &PackageConfig{
 		Variables:    make([]PackageVariable, len(p.Variables)),
-		ServerConfig: make(map[string]string),
-		AgentConfig:  make(map[string]string),
+		ServerConfig: make(map[string]interface{}),
+		AgentConfig:  make(map[string]interface{}),
 		HelmValues:   make(map[string]interface{}),
 		Raw:          make([]byte, len(p.Raw)),
 	}
