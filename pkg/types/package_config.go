@@ -199,6 +199,9 @@ func (p *PackageConfig) RawHelmValuesForChart(chartName string) ([]byte, error) 
 
 // ApplyVariables will template this entire configuration with the given variables
 func (p *PackageConfig) ApplyVariables(vars map[string]string) error {
+	if p.Raw == nil {
+		return nil
+	}
 	out, err := render(p.Raw, vars)
 	if err != nil {
 		return err

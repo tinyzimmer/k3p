@@ -1,6 +1,6 @@
 # k3p
 
-A `k3s` packager and installer, primarily intended for airgapped deployments
+A `k3s` packager and installer, originally and primarily intended for air-gapped deployments, but could see use cases elsewhere.
 
 For documentation on `k3p` usage, see the [command docs here](doc/k3p.md).
 
@@ -12,7 +12,9 @@ For documentation on `k3p` usage, see the [command docs here](doc/k3p.md).
 
 ## Quickstart
 
-Will publish releases via actions in the future. For now, on a system with `git` and `go` installed.
+First download a binary for your system from the [releases](https://github.com/tinyzimmer/k3p/releases) page.
+
+Or, to build from source, on a system with, `make`, `git`, and `go` installed.
 
 ```bash
 git clone https://github.com/tinyzimmer/k3p
@@ -97,4 +99,5 @@ whoami-5dc4dd9cdf-qvvnz   1/1     Running   0          32s
 ```
 
 For further information on adding worker nodes and/or setting up HA, you can view the command documentation, 
-however more complete documentation will come in the future in the form of [examples](examples/).
+however more complete documentation will come in the future in the form of [examples](examples/) and other docs.
+There are already a few simple examples that you can use to get a general understanding of the workflow.

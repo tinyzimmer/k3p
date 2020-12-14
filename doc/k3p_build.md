@@ -11,7 +11,7 @@ k3p build [flags]
 ```
   -a, --arch string             The architecture to package the distribution for. Only (amd64, arm, and arm64 are supported) (default "amd64")
   -C, --channel string          The release channel to retrieve the version of k3s from (default "stable")
-  -c, --config string           An optional config file providing variables to be used at installation
+  -c, --config string           An optional file providing variables and other configurations to be used at installation, if a k3p.yaml in the current directory exists it will be used automatically
   -E, --eula string             A file containing an End User License Agreement to display to the user upon installing the package
   -e, --exclude strings         Directories to exclude when reading the manifest directory
       --exclude-images          Don't include container images with the final archive

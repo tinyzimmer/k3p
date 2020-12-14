@@ -18,7 +18,7 @@ Then build a package in this directory using the provided config:
 
 ```sh
 # For the sake of producing a smaller artifact, we'll use the --exclude-images flag
-$ k3p build -c config.yaml  --exclude-images --name kvdi
+$ k3p build --exclude-images --name kvdi
 2020/12/11 20:32:08  [INFO]     Building package "kvdi"
 2020/12/11 20:32:08  [INFO]     Detecting latest k3s version for channel stable
 2020/12/11 20:32:09  [INFO]     Latest k3s version is v1.19.4+k3s1

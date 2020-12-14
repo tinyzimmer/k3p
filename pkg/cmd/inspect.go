@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"archive/tar"
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -168,6 +170,14 @@ var inspectCmd = &cobra.Command{
 					fmt.Println("    ", vari.Name, "(required)")
 				} else {
 					fmt.Println("    ", vari.Name, fmt.Sprintf("(default %q)", vari.Default))
+				}
+			}
+			if inspectDetails {
+				fmt.Println()
+				fmt.Println("  CONFIG")
+				scanner := bufio.NewScanner(bytes.NewReader(cfg.Raw))
+				for scanner.Scan() {
+					fmt.Println("    ", scanner.Text())
 				}
 			}
 		}

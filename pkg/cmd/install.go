@@ -41,6 +41,12 @@ var (
 
 func init() {
 
+	var currentUser *user.User
+	var err error
+	if currentUser, err = user.Current(); err != nil {
+		log.Fatal(err)
+	}
+
 	installCmd.Flags().StringVarP(&installValuesFile, "values", "f", "", "An optional json or yaml file containing key-value pairs of package configurations")
 	installCmd.Flags().StringArrayVar(&installValues, "set", []string{}, "Values to set to configurations in the package in the format of --set <name>=<value>")
 	installCmd.Flags().BoolVar(&installAcceptDefaults, "accept-defaults", false, "Accept the defaults for any package configurations, default behavior is to prompt for all unprovided values")
@@ -103,19 +109,14 @@ pre-generated one.`)
 
 	// Remote installation options
 
-	u, err := user.Current()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	var defaultKeyArg string
-	defaultKeyPath := path.Join(u.HomeDir, ".ssh", "id_rsa")
+	defaultKeyPath := path.Join(currentUser.HomeDir, ".ssh", "id_rsa")
 	if _, err := os.Stat(defaultKeyPath); err == nil {
 		defaultKeyArg = defaultKeyPath
 	}
 
 	installCmd.Flags().StringVarP(&installConnectOpts.Address, "host", "H", "", "The IP or DNS name of a remote host to perform the installation against")
-	installCmd.Flags().StringVarP(&installConnectOpts.SSHUser, "ssh-user", "u", u.Username, "The username to use when authenticating against the remote host")
+	installCmd.Flags().StringVarP(&installConnectOpts.SSHUser, "ssh-user", "u", currentUser.Username, "The username to use when authenticating against the remote host")
 	installCmd.Flags().StringVarP(&installConnectOpts.SSHKeyFile, "private-key", "k", defaultKeyArg, `The path to a private key to use when authenticating against the remote host, 
 if not provided you will be prompted for a password`)
 	installCmd.Flags().IntVarP(&installConnectOpts.SSHPort, "ssh-port", "P", 22, "The port to use when connecting to the remote host over SSH")

@@ -29,6 +29,11 @@ func init() {
 		log.Fatal(err)
 	}
 
+	var defaultConfig string
+	if _, err := os.Stat(path.Join(cwd, "k3p.yaml")); err == nil {
+		defaultConfig = path.Join(cwd, "k3p.yaml")
+	}
+
 	buildOpts = &types.BuildOptions{}
 
 	buildCmd.Flags().StringVarP(&buildOpts.Name, "name", "n", "", "The name to give the package, if not provided one will be generated")
@@ -44,7 +49,7 @@ func init() {
 	buildCmd.Flags().StringVarP(&buildOpts.Output, "output", "o", path.Join(cwd, "package.tar"), "The file to save the distribution package to")
 	buildCmd.Flags().BoolVar(&buildOpts.ExcludeImages, "exclude-images", false, "Don't include container images with the final archive")
 	buildCmd.Flags().StringVar(&buildPullPolicy, "pull-policy", string(types.PullPolicyAlways), "The pull policy to use when bundling container images (valid options always,never,ifnotpresent [case-insensitive])")
-	buildCmd.Flags().StringVarP(&buildOpts.ConfigFile, "config", "c", "", "An optional config file providing variables to be used at installation")
+	buildCmd.Flags().StringVarP(&buildOpts.ConfigFile, "config", "c", defaultConfig, "An optional file providing variables and other configurations to be used at installation, if a k3p.yaml in the current directory exists it will be used automatically")
 	buildCmd.Flags().BoolVarP(&cache.NoCache, "no-cache", "N", false, "Disable the use of the local cache when downloading assets")
 
 	buildCmd.MarkFlagDirname("exclude")

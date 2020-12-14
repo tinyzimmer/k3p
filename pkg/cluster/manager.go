@@ -195,8 +195,10 @@ func (m *manager) AddNode(newNode types.Node, opts *types.AddNodeOptions) error 
 func buildInstallOpts(pkg types.Package, cfg *types.InstallConfig, remoteAddr, token string, nodeRole types.K3sRole) (*types.ExecuteOptions, error) {
 	opts := cfg.DeepCopy().InstallOptions
 	pkgConf := pkg.GetMeta().DeepCopy().Sanitize().GetPackageConfig()
-	if err := pkgConf.ApplyVariables(opts.Variables); err != nil {
-		return nil, err
+	if pkgConf != nil {
+		if err := pkgConf.ApplyVariables(opts.Variables); err != nil {
+			return nil, err
+		}
 	}
 	opts.ServerURL = fmt.Sprintf("https://%s:%d", remoteAddr, cfg.InstallOptions.APIListenPort)
 	opts.NodeToken = token

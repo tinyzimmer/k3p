@@ -26,22 +26,23 @@ var (
 )
 
 func init() {
+	var currentUser *user.User
+	var err error
+	if currentUser, err = user.Current(); err != nil {
+		log.Fatal(err)
+	}
+
 	nodeConnectOpts = &types.NodeConnectOptions{}
 	nodeAddOpts = &types.AddNodeOptions{}
 	nodeRemoveOpts = &types.RemoveNodeOptions{}
 
-	u, err := user.Current()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	var defaultKeyArg string
-	defaultKeyPath := path.Join(u.HomeDir, ".ssh", "id_rsa")
+	defaultKeyPath := path.Join(currentUser.HomeDir, ".ssh", "id_rsa")
 	if _, err := os.Stat(defaultKeyPath); err == nil {
 		defaultKeyArg = defaultKeyPath
 	}
 
-	nodesCmd.PersistentFlags().StringVarP(&nodeConnectOpts.SSHUser, "ssh-user", "u", u.Username, "The remote user to use for SSH authentication")
+	nodesCmd.PersistentFlags().StringVarP(&nodeConnectOpts.SSHUser, "ssh-user", "u", currentUser.Username, "The remote user to use for SSH authentication")
 	nodesCmd.PersistentFlags().StringVarP(&nodeConnectOpts.SSHKeyFile, "private-key", "k", defaultKeyArg, "A private key to use for SSH authentication, if not provided you will be prompted for a password")
 	nodesCmd.PersistentFlags().IntVarP(&nodeConnectOpts.SSHPort, "ssh-port", "p", 22, "The port to use when connecting to the remote instance over SSH")
 	nodesCmd.PersistentFlags().StringVarP(&nodeRemoteLeader, "leader", "L", "", `The IP address or DNS name of the leader of the cluster.

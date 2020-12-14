@@ -13,9 +13,7 @@ var (
 
 func init() {
 	uninstallCmd.Flags().StringVarP(&uninstallName, "name", "n", "", "The name of the package to uninstall (required for docker)")
-	if err := uninstallCmd.MarkFlagRequired("name"); err != nil {
-		log.Fatal(err)
-	}
+	uninstallCmd.MarkFlagRequired("name")
 	uninstallCmd.RegisterFlagCompletionFunc("name", completeClusters)
 
 	rootCmd.AddCommand(uninstallCmd)

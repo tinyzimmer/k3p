@@ -1,0 +1,67 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whoami
+  namespace: default
+  labels:
+    app: whoami
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: whoami
+  template:
+    metadata:
+      labels:
+        app: whoami
+      annotations:
+    spec:
+      containers:
+        - name: whoami
+          image: "traefik/whoami:latest"
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 80
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - whoami
+            topologyKey: "kubernetes.io/hostname"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami
+  namespace: default
+  labels:
+    app: whoami
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+  selector:
+    app: whoami
+---
+kind: Ingress
+apiVersion: extensions/v1beta1
+metadata:
+  name: whoami
+  namespace: default
+spec:
+  rules:
+    - host: localhost
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: whoami
+              servicePort: 80

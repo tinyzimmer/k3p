@@ -6,7 +6,9 @@ the variable and templating functionality for accepting user input at installati
 To build the example:
 
 ```bash
-k3p build -c config.yaml
+# k3p build will use k3p.yaml automatically if it exists in the current working directory.
+# otherwise you can specify the path to one with the --config flag.
+$ k3p build
 # ...
 # ...
 ```
