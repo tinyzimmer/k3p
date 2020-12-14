@@ -14,8 +14,7 @@ type Artifact struct {
 	Type ArtifactType
 	// The name of the artifact (this can include subdirectories)
 	Name string
-	// The size of the artifact, only populated on retrieval, or if made
-	// with the ArtifactFromReader method in the utils package.
+	// The size of the artifact
 	Size int64
 	// The contents of the artifact
 	Body io.ReadCloser

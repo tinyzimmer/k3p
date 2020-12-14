@@ -55,6 +55,7 @@ type ExecuteOptions struct {
 // GetAPIPort returns the API port configured for these ExecuteOptions. This is a bit of a hack
 // for the fact that the user is allowed to pass in raw k3s exec strings. A lot of this needs to
 // be refactored.
+// What made this necessary is now taken care of, it may be safe to reevaluate this now.
 func (e *ExecuteOptions) GetAPIPort() int {
 	for k, v := range e.Env {
 		if k == "INSTALL_K3S_EXEC" {
