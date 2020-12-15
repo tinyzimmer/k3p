@@ -28,4 +28,4 @@ Please provide a value for traefikDisabled [false]:
 
 The variable functionality is limited to strings and requires default values be set. For complex templating it is better to
 embed a helm chart and use the variables for simple substitutions on the values passed to that chart. You can see an example of this
-in the [kvdi example](../kvdi).
+in the [helm-charts example](../helm-charts).

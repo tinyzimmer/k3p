@@ -152,10 +152,8 @@ type tmpReadCloser struct {
 func (r *tmpReadCloser) Read(p []byte) (int, error) { return r.f.Read(p) }
 
 func (r *tmpReadCloser) Close() error {
-	if err := r.f.Close(); err != nil {
-		return err
-	}
-	return os.RemoveAll(r.tmpDir)
+	defer os.RemoveAll(r.tmpDir)
+	return r.f.Close()
 }
 
 // ArtifactFromReader will create a new types.Artifact object with the name and type provided. Its contents
