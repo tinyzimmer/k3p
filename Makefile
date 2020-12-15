@@ -32,7 +32,9 @@ pkg: $(PACKAGE)
 
 $(BIN):
 	cd cmd/k3p && \
-		CGO_ENABLED=0 GOOS=linux go build -o $(BIN) .
+		CGO_ENABLED=0 GOOS=linux \
+		go build -o $(BIN) \
+			-ldflags "-X github.com/tinyzimmer/k3p/pkg/build/package/v1.ZstDictionaryB64=`cat ../../hack/zstDictionary | base64 --wrap=0`" .
 
 PKG_ARGS ?=
 $(PACKAGE): $(BIN)

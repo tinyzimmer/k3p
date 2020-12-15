@@ -33,14 +33,25 @@ func init() {
 
 func completeManifests(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	log.Verbose = false
-	f, err := os.Open(args[0])
+
+	var pkgReader io.ReadCloser
+	var err error
+
+	pkgReader, err = os.Open(args[0])
 	if err != nil {
-		return nil, cobra.ShellCompDirectiveDefault
+		return nil, cobra.ShellCompDirectiveError
 	}
-	defer f.Close()
-	pkg, err := v1.Load(f)
+
+	if strings.HasSuffix(args[0], ".zst") {
+		pkgReader, err = v1.Decompress(pkgReader)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+	}
+
+	pkg, err := v1.Load(pkgReader)
 	if err != nil {
-		return nil, cobra.ShellCompDirectiveDefault
+		return nil, cobra.ShellCompDirectiveError
 	}
 	defer pkg.Close()
 	manifest := pkg.GetMeta().GetManifest()
@@ -55,12 +66,22 @@ var inspectCmd = &cobra.Command{
 		return []string{"tar"}, cobra.ShellCompDirectiveFilterFileExt
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		f, err := os.Open(args[0])
+		var pkgReader io.ReadCloser
+		var err error
+
+		pkgReader, err = os.Open(args[0])
 		if err != nil {
 			return err
 		}
-		defer f.Close()
-		pkg, err := v1.Load(f)
+
+		if strings.HasSuffix(args[0], ".zst") {
+			pkgReader, err = v1.Decompress(pkgReader)
+			if err != nil {
+				return err
+			}
+		}
+
+		pkg, err := v1.Load(pkgReader)
 		if err != nil {
 			return err
 		}

@@ -32,6 +32,8 @@ type Archive interface {
 	Reader() io.ReadCloser
 	// WriteTo should dump the contents of the archive to the given file.
 	WriteTo(path string) error
+	// CompressTo should compress the contents of the archive to the given zst file.
+	CompressTo(path string) error
 	// Size should return the size of the archive.
 	Size() int64
 }

@@ -447,6 +447,7 @@ func setupDockerCluster(leader types.Node, pkg types.Package) error {
 	return lb.Execute(installOpts.ToExecOpts(pkg.GetMeta().GetPackageConfig()))
 }
 
+// yea its ugly ill fix
 func getPackage(path string) (types.Package, error) {
 	if strings.HasPrefix(path, "http") {
 		log.Info("Downloading the archive from", path)
@@ -456,6 +457,13 @@ func getPackage(path string) (types.Package, error) {
 		}
 		defer resp.Body.Close()
 		log.Info("Loading the archive")
+		if strings.HasSuffix(path, ".zst") {
+			dec, err := v1.Decompress(resp.Body)
+			if err != nil {
+				return nil, err
+			}
+			return v1.Load(dec)
+		}
 		return v1.Load(resp.Body)
 	}
 	log.Info("Loading the archive")
@@ -464,5 +472,12 @@ func getPackage(path string) (types.Package, error) {
 		return nil, err
 	}
 	defer f.Close()
+	if strings.HasSuffix(path, ".zst") {
+		dec, err := v1.Decompress(f)
+		if err != nil {
+			return nil, err
+		}
+		return v1.Load(dec)
+	}
 	return v1.Load(f)
 }

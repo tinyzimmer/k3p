@@ -1,6 +1,7 @@
 package build
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -132,11 +133,20 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 	if cfg := b.writer.GetMeta().GetPackageConfig(); cfg != nil {
 		log.Debugf("Complete package config: %+v\n", *cfg)
 	}
-	log.Infof("Archiving version %q of %q to %q\n", opts.BuildVersion, opts.Name, opts.Output)
+
+	log.Info("Finalizing archive")
 	archive, err := b.writer.Archive()
 	if err != nil {
 		return err
 	}
+
+	if opts.Compress {
+		compName := fmt.Sprintf("%s.zst", opts.Output)
+		log.Infof("Writing version %q of %q to %q\n", opts.BuildVersion, opts.Name, compName)
+		return archive.CompressTo(compName)
+	}
+
+	log.Infof("Writing version %q of %q to %q\n", opts.BuildVersion, opts.Name, opts.Output)
 	return archive.WriteTo(opts.Output)
 }
 

@@ -3,5 +3,6 @@ vendor/
 *.tar
 *.tgz
 *.tar.gz
+*.tar.zst
 *.coverprofile
 *.dat

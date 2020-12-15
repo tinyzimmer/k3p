@@ -46,4 +46,6 @@ type BuildOptions struct {
 	PullPolicy PullPolicy
 	// The path to write the final archive to
 	Output string
+	// Whether to apply zst compression to the final archive
+	Compress bool
 }

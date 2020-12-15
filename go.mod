@@ -12,6 +12,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/huandu/xstrings v1.3.2 // indirect
+	github.com/klauspost/compress v1.11.3
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/onsi/ginkgo v1.14.2
 	github.com/onsi/gomega v1.10.3

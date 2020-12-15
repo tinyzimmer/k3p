@@ -51,6 +51,7 @@ func init() {
 	buildCmd.Flags().StringVar(&buildPullPolicy, "pull-policy", string(types.PullPolicyAlways), "The pull policy to use when bundling container images (valid options always,never,ifnotpresent [case-insensitive])")
 	buildCmd.Flags().StringVarP(&buildOpts.ConfigFile, "config", "c", defaultConfig, "An optional file providing variables and other configurations to be used at installation, if a k3p.yaml in the current directory exists it will be used automatically")
 	buildCmd.Flags().BoolVarP(&cache.NoCache, "no-cache", "N", false, "Disable the use of the local cache when downloading assets")
+	buildCmd.Flags().BoolVar(&buildOpts.Compress, "compress", false, "Whether to apply zst encryption to the package, it will usually require the same k3p release to decompress.")
 
 	buildCmd.MarkFlagDirname("exclude")
 	buildCmd.MarkFlagDirname("manifests")
