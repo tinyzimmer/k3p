@@ -1,10 +1,18 @@
 package build
 
 import (
+	"archive/tar"
+	"bytes"
 	"fmt"
+	"html/template"
+	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"strings"
+	"time"
+
+	uu "github.com/sanylcs/uuencode"
 
 	v1 "github.com/tinyzimmer/k3p/pkg/build/package/v1"
 	"github.com/tinyzimmer/k3p/pkg/images"
@@ -12,6 +20,7 @@ import (
 	"github.com/tinyzimmer/k3p/pkg/parser"
 	"github.com/tinyzimmer/k3p/pkg/types"
 	"github.com/tinyzimmer/k3p/pkg/util"
+	"golang.org/x/text/transform"
 )
 
 // NewBuilder returns a new Builder for the given K3s version and architecture. If tmpDir
@@ -140,6 +149,10 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 		return err
 	}
 
+	if opts.RunFile {
+		return makeRunFile(opts, archive)
+	}
+
 	if opts.Compress {
 		compName := fmt.Sprintf("%s.zst", opts.Output)
 		log.Infof("Writing version %q of %q to %q\n", opts.BuildVersion, opts.Name, compName)
@@ -186,4 +199,223 @@ func (b *builder) bundleImages(opts *types.BuildOptions, parser types.ManifestPa
 	}
 
 	return b.writer.Put(images)
+}
+
+var runFilePreSeed = template.Must(template.New("").Parse(`#!/bin/sh
+
+cleanup() {
+	rm -f {{ .TarName }}
+	rm -rf {{ .DirName }}
+}
+
+cleanup
+trap cleanup EXIT
+
+BOLD='\033[1m'
+INFO='\033[0;34m'
+NOTICE='\033[0;36m'
+NC='\033[0m'
+
+info() {
+	echo -en "${NOTICE}{{ .Backtick }}date +'%Y/%m/%d %H:%M:%S'{{ .Backtick }}"
+	echo -en "${INFO}  [INFO]\t${NC}"
+	echo -e "${BOLD}${1}${NC}"
+}
+
+info "Extracting runfile..."
+
+uudecode $0
+mkdir -p {{ .DirName }}
+tar xf {{ .TarName }}
+
+if [ -z ${1} ] || [ "${1}" == "install" ] || [ {{ .Backtick }}echo ${1} | cut -c1-1{{ .Backtick }} = "-" ] ; then
+	if [ "${1}" == "install" ] ; then shift ; fi
+	cmd="./{{ .DirName }}/{{ .K3pBin }} install {{ .DirName }}/{{ .PackageFile }}"
+elif [ "${1}" == "inspect" ] ; then
+	shift
+	cmd="./{{ .DirName }}/{{ .K3pBin }} inspect {{ .DirName }}/{{ .PackageFile }}"
+else
+	cmd="./{{ .DirName }}/{{ .K3pBin }}"
+fi
+
+${cmd} ${@}
+
+exit $?
+
+`))
+
+var (
+	runTarName = ".run.tar"
+	runDirName = ".k3p-run"
+	runK3pBin  = "k3p"
+)
+
+func tmplSeed(pkgFile string) ([]byte, error) {
+	var out bytes.Buffer
+	if err := runFilePreSeed.Execute(&out, map[string]string{
+		"TarName":     runTarName,
+		"DirName":     runDirName,
+		"K3pBin":      runK3pBin,
+		"PackageFile": pkgFile,
+		"Backtick":    "`",
+	}); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
+}
+
+func makeRunFile(opts *types.BuildOptions, archive types.Archive) error {
+	if strings.HasSuffix(opts.Output, "tar") {
+		opts.Output = strings.Replace(opts.Output, ".tar", ".run", 1)
+	}
+
+	pkgFile := "package.tar"
+	if opts.Compress {
+		pkgFile = "package.tar.zst"
+	}
+
+	log.Infof("Writing k3p executable and package contents to run file %q\n", opts.Output)
+
+	runFile, err := os.OpenFile(opts.Output, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	if err != nil {
+		return err
+	}
+
+	runFileSeed, err := tmplSeed(pkgFile)
+	if err != nil {
+		return err
+	}
+	if _, err := runFile.Write(runFileSeed); err != nil {
+		return err
+	}
+
+	r, w := io.Pipe()
+	errors := make(chan error)
+
+	// kick off a goroutine feeding the tar data to the run file
+	go func() {
+		tw := tar.NewWriter(w)
+		now := time.Now()
+		// downloadURL := fmt.Sprintf("https://github.com/tinyzimmer/k3p/releases/download/%s/k3p_linux_%s", version.K3pVersion, opts.Arch)
+		// bin, err := cache.DefaultCache.Get(downloadURL)
+		// until i open the repo - the releases can't be downloaded - just use the current executable
+		// (which obviously will not always be linux, and it has to be for installations besides docker)
+		ex, err := os.Executable()
+		if err != nil {
+			errors <- err
+			return
+		}
+		bin, err := os.Open(ex)
+		if err != nil {
+			errors <- err
+			return
+		}
+		binStat, err := os.Stat(ex)
+		if err != nil {
+			errors <- err
+			return
+		}
+
+		// Write the k3p binary to the tar ball
+		if err := tw.WriteHeader(&tar.Header{
+			Typeflag: tar.TypeReg,
+			Name:     path.Join(runDirName, runK3pBin),
+			Size:     binStat.Size(),
+			Mode:     0755,
+			Uid:      0, Gid: 0,
+			Uname: "root", Gname: "root",
+			ModTime: now, AccessTime: now, ChangeTime: now,
+		}); err != nil {
+			errors <- err
+			return
+		}
+
+		if _, err := io.Copy(tw, bin); err != nil {
+			errors <- err
+			return
+		}
+		if err := bin.Close(); err != nil {
+			errors <- err
+			return
+		}
+
+		// Write the archive to the tar ball
+		rdr := archive.Reader()
+		size := archive.Size()
+		if opts.Compress {
+			// need to compress to a tempfile first
+			tmpFile, err := ioutil.TempFile(util.TempDir, "")
+			if err != nil {
+				errors <- err
+				return
+			}
+			defer os.Remove(tmpFile.Name())
+			compressedReader, err := archive.CompressReader()
+			if err != nil {
+				errors <- err
+				return
+			}
+			if _, err := io.Copy(tmpFile, compressedReader); err != nil {
+				errors <- err
+				return
+			}
+			if err := tmpFile.Close(); err != nil {
+				errors <- err
+				return
+			}
+			stat, err := os.Stat(tmpFile.Name())
+			if err != nil {
+				errors <- err
+				return
+			}
+			size = stat.Size()
+			rdr, err = os.Open(tmpFile.Name())
+			if err != nil {
+				errors <- err
+				return
+			}
+		}
+		if err := tw.WriteHeader(&tar.Header{
+			Typeflag: tar.TypeReg,
+			Name:     path.Join(runDirName, pkgFile),
+			Size:     size,
+			Mode:     0644,
+			Uid:      0, Gid: 0,
+			Uname: "root", Gname: "root",
+			ModTime: now, AccessTime: now, ChangeTime: now,
+		}); err != nil {
+			errors <- err
+			return
+		}
+
+		if _, err := io.Copy(tw, rdr); err != nil {
+			errors <- err
+			return
+		}
+
+		// Close everything to signal the other end of the pipe
+		if err := tw.Close(); err != nil {
+			errors <- err
+			return
+		}
+
+		errors <- w.Close()
+	}()
+
+	e := uu.NewEncode(true, "\r\n")
+
+	e.ResetAll("0644", runTarName)
+	if _, err := io.Copy(runFile, transform.NewReader(r, e)); err != nil {
+		return err
+	}
+
+	if _, err := runFile.Write([]byte("end\n")); err != nil {
+		return err
+	}
+
+	if err := runFile.Close(); err != nil {
+		return err
+	}
+
+	return <-errors
 }

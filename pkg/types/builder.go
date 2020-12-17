@@ -48,4 +48,6 @@ type BuildOptions struct {
 	Output string
 	// Whether to apply zst compression to the final archive
 	Compress bool
+	// Whether to write the outputs to a self-installing run file
+	RunFile bool
 }

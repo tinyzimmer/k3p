@@ -1,13 +1,18 @@
 DIST ?= $(CURDIR)/dist
 BIN ?= $(DIST)/k3p
-PACKAGE ?= $(DIST)/package.tar
 GOPATH ?= $(shell go env GOPATH)
 GOBIN ?= $(GOPATH)/bin
+GOOS ?= linux
+CGO_ENABLED ?= 0
 
 GOLANGCI_VERSION ?= v1.33.0
 GOLANGCI_LINT ?= $(GOBIN)/golangci-lint
 GINKGO ?= $(GOBIN)/ginkgo
 GOX ?= $(GOBIN)/gox
+
+LDFLAGS ?= "-X github.com/tinyzimmer/k3p/pkg/build/package/v1.ZstDictionaryB64=`cat ../../hack/zstDictionary | base64 --wrap=0` \
+			-X github.com/tinyzimmer/k3p/pkg/version.K3pVersion=`git describe --tags` \
+			-X github.com/tinyzimmer/k3p/pkg/version.K3pCommit=`git rev-parse HEAD`"
 
 # Builds the k3p binary
 build: $(BIN)
@@ -16,29 +21,24 @@ $(GOX):
 	GO111MODULE=off go get github.com/mitchellh/gox
 
 .PHONY: dist
+COMP_TARGETS ?= "darwin/amd64 linux/amd64 linux/arm linux/arm64 windows/amd64"
+COMP_OUTPUT ?= "$(DIST)/{{.Dir}}_{{.OS}}_{{.Arch}}"
 dist: $(GOX)
 	cd cmd/k3p && \
-		CGO_ENABLED=0 $(GOX) -os "linux windows" -arch "amd64 arm" --output "../../dist/{{.Dir}}_{{.OS}}_{{.Arch}}"
-	cd cmd/k3p && \
-		CGO_ENABLED=0 $(GOX) -os "darwin" -arch "amd64" --output "../../dist/{{.Dir}}_macOS_{{.Arch}}"
+		CGO_ENABLED=0 $(GOX) -osarch $(COMP_TARGETS) --output $(COMP_OUTPUT) -ldflags=$(LDFLAGS)
+	which upx 2> /dev/null && upx $(DIST)/*
 
 
 install: $(BIN)
 	mkdir -p $(GOBIN)
 	cp $(BIN) $(GOBIN)/k3p
 
-# Runs k3p build with any extra arguments
-pkg: $(PACKAGE)
-
 $(BIN):
 	cd cmd/k3p && \
-		CGO_ENABLED=0 GOOS=linux \
+		CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) \
 		go build -o $(BIN) \
-			-ldflags "-X github.com/tinyzimmer/k3p/pkg/build/package/v1.ZstDictionaryB64=`cat ../../hack/zstDictionary | base64 --wrap=0`" .
-
-PKG_ARGS ?=
-$(PACKAGE): $(BIN)
-	$(BIN) build -o $(PACKAGE) --name k3p-test --manifests examples/whoami $(PKG_ARGS)
+			-ldflags $(LDFLAGS)
+	which upx 2> /dev/null && upx $(BIN)
 
 docs:
 	go run hack/docgen.go

@@ -13,11 +13,14 @@ require (
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/klauspost/compress v1.11.3
+	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/onsi/ginkgo v1.14.2
 	github.com/onsi/gomega v1.10.3
+	github.com/sanylcs/uuencode v0.0.0-20161224062037-797cde56591b
 	github.com/spf13/cobra v1.1.1
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
+	golang.org/x/text v0.3.3
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm v2.17.0+incompatible
 	helm.sh/helm/v3 v3.4.2

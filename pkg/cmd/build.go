@@ -52,6 +52,7 @@ func init() {
 	buildCmd.Flags().StringVarP(&buildOpts.ConfigFile, "config", "c", defaultConfig, "An optional file providing variables and other configurations to be used at installation, if a k3p.yaml in the current directory exists it will be used automatically")
 	buildCmd.Flags().BoolVarP(&cache.NoCache, "no-cache", "N", false, "Disable the use of the local cache when downloading assets")
 	buildCmd.Flags().BoolVar(&buildOpts.Compress, "compress", false, "Whether to apply zst encryption to the package, it will usually require the same k3p release to decompress.")
+	buildCmd.Flags().BoolVar(&buildOpts.RunFile, "run-file", false, "Whether to bundle the final archive into a self-installing run file")
 
 	buildCmd.MarkFlagDirname("exclude")
 	buildCmd.MarkFlagDirname("manifests")
@@ -66,7 +67,7 @@ func init() {
 var buildCmd = &cobra.Command{
 	Use:   "build",
 	Short: "Build a k3s distribution package",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	PreRunE: func(cmd *cobra.Command, args []string) error {
 		// validate pull policy first
 		switch types.PullPolicy(strings.ToLower(buildPullPolicy)) {
 		case types.PullPolicyAlways:
@@ -78,6 +79,9 @@ var buildCmd = &cobra.Command{
 		default:
 			return fmt.Errorf("%s is not a valid pull policy", buildPullPolicy)
 		}
+		return nil
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
 		builder, err := build.NewBuilder()
 		if err != nil {
 			return err

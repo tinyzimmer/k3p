@@ -6,3 +6,4 @@ vendor/
 *.tar.zst
 *.coverprofile
 *.dat
+*.run

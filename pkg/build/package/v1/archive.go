@@ -6,11 +6,16 @@ import (
 	"os"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/tinyzimmer/k3p/pkg/log"
 )
 
 // ZstDictionaryB64 is populated at compilation and contains a pre-trained dictionary
 // for compressing k3s images.
 var ZstDictionaryB64 string
+
+func getZstDict() ([]byte, error) {
+	return base64.StdEncoding.DecodeString(ZstDictionaryB64)
+}
 
 type archive struct {
 	stat os.FileInfo
@@ -38,22 +43,40 @@ func (a *archive) Size() int64 { return a.stat.Size() }
 // Compression is done using zstandard and a dictionary pre-trained on k3s
 // docker images.
 func (a *archive) CompressTo(path string) error {
-	dictBytes, err := base64.StdEncoding.DecodeString(ZstDictionaryB64)
-	if err != nil {
-		return err
-	}
 	out, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	defer out.Close()
-	enc, err := zstd.NewWriter(out, zstd.WithEncoderDict(dictBytes))
+	crdr, err := a.CompressReader()
 	if err != nil {
 		return err
 	}
-	defer enc.Close()
-	_, err = io.Copy(enc, a.f)
+	defer crdr.Close()
+	_, err = io.Copy(out, crdr)
 	return err
+}
+
+// CompressReader should return an io.ReadCloser who's contents are compressed
+// with zstandard.
+func (a *archive) CompressReader() (io.ReadCloser, error) {
+	dictBytes, err := getZstDict()
+	if err != nil {
+		return nil, err
+	}
+	r, w := io.Pipe()
+	enc, err := zstd.NewWriter(w, zstd.WithEncoderDict(dictBytes))
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		defer w.Close()
+		defer enc.Close()
+		if _, err := io.Copy(enc, a.f); err != nil {
+			log.Error(err)
+		}
+	}()
+	return r, nil
 }
 
 type zstReadCloser struct{ rdr *zstd.Decoder }
@@ -68,7 +91,7 @@ func (z *zstReadCloser) Close() error {
 // Decompress will return a reader that can be used to access the decompressed contents
 // of a zst archive.
 func Decompress(rdr io.Reader) (io.ReadCloser, error) {
-	dictBytes, err := base64.StdEncoding.DecodeString(ZstDictionaryB64)
+	dictBytes, err := getZstDict()
 	if err != nil {
 		return nil, err
 	}

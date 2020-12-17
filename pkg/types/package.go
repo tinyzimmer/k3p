@@ -34,6 +34,10 @@ type Archive interface {
 	WriteTo(path string) error
 	// CompressTo should compress the contents of the archive to the given zst file.
 	CompressTo(path string) error
+	// CompressReader should return an io.ReadCloser who's contents are compressed
+	// with zstandard. The value returned by Size() will not accurately reflect the
+	// contents of this Reader.
+	CompressReader() (io.ReadCloser, error)
 	// Size should return the size of the archive.
 	Size() int64
 }
