@@ -11,6 +11,7 @@ k3p build [flags]
 ```
   -a, --arch string             The architecture to package the distribution for. Only (amd64, arm, and arm64 are supported) (default "amd64")
   -C, --channel string          The release channel to retrieve the version of k3s from (default "stable")
+      --compress                Whether to apply zst encryption to the package, it will usually require the same k3p release to decompress.
   -c, --config string           An optional file providing variables and other configurations to be used at installation, if a k3p.yaml in the current directory exists it will be used automatically
   -E, --eula string             A file containing an End User License Agreement to display to the user upon installing the package
   -e, --exclude strings         Directories to exclude when reading the manifest directory
@@ -24,6 +25,7 @@ k3p build [flags]
   -N, --no-cache                Disable the use of the local cache when downloading assets
   -o, --output string           The file to save the distribution package to (default "/home/<user>/devel/k3p/package.tar")
       --pull-policy string      The pull policy to use when bundling container images (valid options always,never,ifnotpresent [case-insensitive]) (default "always")
+      --run-file                Whether to bundle the final archive into a self-installing run file
   -V, --version string          The version to tag the package (default "latest")
 ```
 

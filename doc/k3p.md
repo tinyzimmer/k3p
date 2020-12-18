@@ -27,4 +27,5 @@ The k3p command provides an easy method for packaging a kubernetes environment i
 * [k3p node](k3p_node.md)	 - Node management commands
 * [k3p token](k3p_token.md)	 - Token retrieval and generation commands
 * [k3p uninstall](k3p_uninstall.md)	 - Uninstall a k3p package (currently only for docker)
+* [k3p version](k3p_version.md)	 - Display version information for k3p
 

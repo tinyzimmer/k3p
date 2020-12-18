@@ -25,7 +25,7 @@ COMP_TARGETS ?= "darwin/amd64 linux/amd64 linux/arm linux/arm64 windows/amd64"
 COMP_OUTPUT ?= "$(DIST)/{{.Dir}}_{{.OS}}_{{.Arch}}"
 dist: $(GOX)
 	cd cmd/k3p && \
-		CGO_ENABLED=0 $(GOX) -osarch $(COMP_TARGETS) --output $(COMP_OUTPUT) -ldflags=$(LDFLAGS)
+		CGO_ENABLED=$(CGO_ENABLED) $(GOX) -osarch $(COMP_TARGETS) --output $(COMP_OUTPUT) -ldflags=$(LDFLAGS)
 	which upx 2> /dev/null && upx $(DIST)/*
 
 
