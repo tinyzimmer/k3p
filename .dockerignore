@@ -1,0 +1,6 @@
+Dockerfile
+.golangci.yml
+examples/
+doc/
+.github/
+README.md

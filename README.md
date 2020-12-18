@@ -26,6 +26,19 @@ cd cmd/k3p
 go build -o $(go env GOPATH)/bin/k3p .
 ```
 
+If you'd like to build a self-installing package currently you need a linux machine. This is until I can publish public releases.
+To get around this on other platforms for now you can build the docker image and use it like this:
+
+```bash
+$ make docker IMG=k3p
+# ...
+$ docker run --rm \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v ~/.k3p:/root/.k3p \
+    -v /path/to/manifests:/manifests \
+    k3p build --run-file --compress
+```
+
 You can build a package with the `build` command. By default it will scan your current directory, and
 detect objects to be included in the archive. See the usage documentation for other configuration options.
 

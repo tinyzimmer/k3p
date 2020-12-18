@@ -10,12 +10,16 @@ GOLANGCI_LINT ?= $(GOBIN)/golangci-lint
 GINKGO ?= $(GOBIN)/ginkgo
 GOX ?= $(GOBIN)/gox
 
-LDFLAGS ?= "-X github.com/tinyzimmer/k3p/pkg/build/package/v1.ZstDictionaryB64=`cat ../../hack/zstDictionary | base64 --wrap=0` \
+LDFLAGS ?= "-X github.com/tinyzimmer/k3p/pkg/build/package/v1.ZstDictionaryB64=`cat '$(CURDIR)/hack/zstDictionary' | base64 --wrap=0` \
 			-X github.com/tinyzimmer/k3p/pkg/version.K3pVersion=`git describe --tags` \
 			-X github.com/tinyzimmer/k3p/pkg/version.K3pCommit=`git rev-parse HEAD`"
 
 # Builds the k3p binary
 build: $(BIN)
+
+IMG ?= ghcr.io/tinyzimmer/k3p:$(shell git describe --tags)
+docker:
+	docker build . -t $(IMG)
 
 $(GOX):
 	GO111MODULE=off go get github.com/mitchellh/gox
@@ -38,7 +42,7 @@ $(BIN):
 		CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) \
 		go build -o $(BIN) \
 			-ldflags $(LDFLAGS)
-	which upx 2> /dev/null && upx $(BIN)
+	which upx &> /dev/null && upx $(BIN)
 
 docs:
 	go run hack/docgen.go

@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
 	"strings"
 	"time"
 
@@ -203,9 +202,8 @@ func (b *builder) bundleImages(opts *types.BuildOptions, parser types.ManifestPa
 
 var runFilePreSeed = template.Must(template.New("").Parse(`#!/bin/sh
 
-cleanup() {
-	rm -f {{ .TarName }}
-	rm -rf {{ .DirName }}
+cleanup() { 
+	rm -rf {{ .DirName }} 
 }
 
 cleanup
@@ -223,10 +221,8 @@ info() {
 }
 
 info "Extracting runfile..."
-
-uudecode $0
 mkdir -p {{ .DirName }}
-tar xf {{ .TarName }}
+uudecode -o /dev/stdout $0 | tar xf -
 
 if [ -z ${1} ] || [ "${1}" == "install" ] || [ {{ .Backtick }}echo ${1} | cut -c1-1{{ .Backtick }} = "-" ] ; then
 	if [ "${1}" == "install" ] ; then shift ; fi
@@ -245,7 +241,6 @@ exit $?
 `))
 
 var (
-	runTarName = ".run.tar"
 	runDirName = ".k3p-run"
 	runK3pBin  = "k3p"
 )
@@ -253,7 +248,6 @@ var (
 func tmplSeed(pkgFile string) ([]byte, error) {
 	var out bytes.Buffer
 	if err := runFilePreSeed.Execute(&out, map[string]string{
-		"TarName":     runTarName,
 		"DirName":     runDirName,
 		"K3pBin":      runK3pBin,
 		"PackageFile": pkgFile,
@@ -294,8 +288,16 @@ func makeRunFile(opts *types.BuildOptions, archive types.Archive) error {
 
 	// kick off a goroutine feeding the tar data to the run file
 	go func() {
+		// Need to close no matter what to stop the read outside this goroutine
+		// from blocking
+		defer w.Close()
+
+		// Create a new tar writer
 		tw := tar.NewWriter(w)
+
+		// get the time
 		now := time.Now()
+
 		// downloadURL := fmt.Sprintf("https://github.com/tinyzimmer/k3p/releases/download/%s/k3p_linux_%s", version.K3pVersion, opts.Arch)
 		// bin, err := cache.DefaultCache.Get(downloadURL)
 		// until i open the repo - the releases can't be downloaded - just use the current executable
@@ -319,7 +321,7 @@ func makeRunFile(opts *types.BuildOptions, archive types.Archive) error {
 		// Write the k3p binary to the tar ball
 		if err := tw.WriteHeader(&tar.Header{
 			Typeflag: tar.TypeReg,
-			Name:     path.Join(runDirName, runK3pBin),
+			Name:     fmt.Sprintf("%s/%s", runDirName, runK3pBin), // must ensure its a linux path separator
 			Size:     binStat.Size(),
 			Mode:     0755,
 			Uid:      0, Gid: 0,
@@ -368,6 +370,7 @@ func makeRunFile(opts *types.BuildOptions, archive types.Archive) error {
 				errors <- err
 				return
 			}
+			// Overwrite the size and the reader
 			size = stat.Size()
 			rdr, err = os.Open(tmpFile.Name())
 			if err != nil {
@@ -377,7 +380,7 @@ func makeRunFile(opts *types.BuildOptions, archive types.Archive) error {
 		}
 		if err := tw.WriteHeader(&tar.Header{
 			Typeflag: tar.TypeReg,
-			Name:     path.Join(runDirName, pkgFile),
+			Name:     fmt.Sprintf("%s/%s", runDirName, pkgFile), // must ensure its a linux path separator
 			Size:     size,
 			Mode:     0644,
 			Uid:      0, Gid: 0,
@@ -393,29 +396,28 @@ func makeRunFile(opts *types.BuildOptions, archive types.Archive) error {
 			return
 		}
 
-		// Close everything to signal the other end of the pipe
+		// Close the tar writer
 		if err := tw.Close(); err != nil {
 			errors <- err
 			return
 		}
-
-		errors <- w.Close()
 	}()
 
 	e := uu.NewEncode(true, "\r\n")
 
-	e.ResetAll("0644", runTarName)
+	// Set the uuencde header
+	e.ResetAll("0644", "run.tar")
+
+	// This will block until the write end of the pipe closes
 	if _, err := io.Copy(runFile, transform.NewReader(r, e)); err != nil {
 		return err
 	}
 
-	if _, err := runFile.Write([]byte("end\n")); err != nil {
-		return err
-	}
-
+	// Close the runfile
 	if err := runFile.Close(); err != nil {
 		return err
 	}
 
+	// return any errors from the goroutine
 	return <-errors
 }
