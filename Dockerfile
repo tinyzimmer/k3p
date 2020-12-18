@@ -14,7 +14,6 @@ RUN go mod download
 COPY . /workspace/
 
 RUN make
-RUN mkdir -p /tmp/empty_tmp
 
 # Make a small alpine image
 FROM alpine:latest
