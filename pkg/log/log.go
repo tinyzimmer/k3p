@@ -126,16 +126,18 @@ func Fatal(args ...interface{}) {
 
 // Debug is the equivalent of a log.Println on the debug logger.
 func Debug(args ...interface{}) {
-	if Verbose {
-		debugLogger.Println(args...)
+	if !Verbose {
+		return
 	}
+	debugLogger.Println(args...)
 }
 
 // Debugf is the equivalent of a log.Printf on the debug logger.
 func Debugf(fstr string, args ...interface{}) {
-	if Verbose {
-		debugLogger.Printf(fstr, args...)
+	if !Verbose {
+		return
 	}
+	debugLogger.Printf(fstr, args...)
 }
 
 func getLoggerForLevel(level Level) *logger {
@@ -155,6 +157,9 @@ func getLoggerForLevel(level Level) *logger {
 // LevelReader is a convenience method for tailing the contents of a reader
 // to the logger specified by the given level.
 func LevelReader(level Level, rdr io.Reader) {
+	if level == LevelDebug && !Verbose {
+		return
+	}
 	l := getLoggerForLevel(level)
 	scanner := bufio.NewScanner(rdr)
 	for scanner.Scan() {
