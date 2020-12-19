@@ -125,10 +125,9 @@ func (opts *InstallOptions) ToExecOpts(cfg *PackageConfig) *ExecuteOptions {
 	}
 
 	return &ExecuteOptions{
-		Env:       env,
-		Command:   fmt.Sprintf("sh %q", path.Join(K3sScriptsDir, "install.sh")),
-		LogPrefix: "K3S",
-		Secrets:   secrets,
+		Env:     env,
+		Command: fmt.Sprintf("sh %q", path.Join(K3sScriptsDir, "install.sh")),
+		Secrets: secrets,
 	}
 }
 

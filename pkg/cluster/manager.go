@@ -109,8 +109,7 @@ ListNodesLoop:
 			return err
 		}
 		return oldNode.Execute(&types.ExecuteOptions{
-			LogPrefix: "K3S",
-			Command:   "k3s-uninstall.sh", // TODO: type cast somewhere
+			Command: "k3s-uninstall.sh", // TODO: type cast somewhere
 		})
 	}
 

@@ -20,6 +20,7 @@ LDFLAGS ?= "-X github.com/tinyzimmer/k3p/pkg/build/package/v1.ZstDictionaryB64=`
 			-X github.com/tinyzimmer/k3p/pkg/version.K3pVersion=$(VERSION) \
 			-X github.com/tinyzimmer/k3p/pkg/version.K3pCommit=$(COMMIT) -s -w"
 
+COMPRESSION ?= 5
 
 build: $(BIN)
 
@@ -29,7 +30,7 @@ $(BIN):
 		go build -o $(BIN) \
 			-ldflags $(LDFLAGS)
 ifneq ($(UPX),)
-	$(UPX) $(BIN)
+	$(UPX) -$(COMPRESSION) $(BIN)
 endif
 
 IMG ?= ghcr.io/tinyzimmer/k3p:$(shell git describe --tags)
@@ -42,7 +43,6 @@ $(GOX):
 .PHONY: dist
 COMPILE_TARGETS ?= "darwin/amd64 linux/amd64 linux/arm linux/arm64 windows/amd64"
 COMPILE_OUTPUT  ?= "$(DIST)/{{.Dir}}_{{.OS}}_{{.Arch}}"
-COMPRESSION ?= 5
 dist: $(GOX)
 	cd cmd/k3p && \
 		CGO_ENABLED=$(CGO_ENABLED) $(GOX) -osarch $(COMPILE_TARGETS) --output $(COMPILE_OUTPUT) -ldflags=$(LDFLAGS)

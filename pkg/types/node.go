@@ -46,8 +46,6 @@ type ExecuteOptions struct {
 	Env map[string]string
 	// The command to run
 	Command string
-	// The prefix with which to log the output of the command
-	LogPrefix string
 	// Secret strings to filter from any logging output
 	Secrets []string
 }

@@ -45,7 +45,7 @@ func (d *dockerImageDownloader) PullImages(images []string, arch string, pullPol
 			if err != nil {
 				return nil, err
 			}
-			log.DebugReader(rdr)
+			log.LevelReader(log.LevelDebug, rdr)
 		case types.PullPolicyIfNotPresent:
 			imgs, err := cli.ImageList(context.TODO(), dockertypes.ImageListOptions{
 				Filters: filters.NewArgs(filters.Arg("reference", image)),
@@ -59,7 +59,7 @@ func (d *dockerImageDownloader) PullImages(images []string, arch string, pullPol
 				if err != nil {
 					return nil, err
 				}
-				log.DebugReader(rdr)
+				log.LevelReader(log.LevelDebug, rdr)
 			} else {
 				log.Infof("Image %s already present on the machine\n", image)
 			}

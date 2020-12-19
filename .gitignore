@@ -7,3 +7,4 @@ vendor/
 *.coverprofile
 *.dat
 *.run
+*kubeconfig.yaml*

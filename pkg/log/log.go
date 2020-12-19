@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -14,6 +13,17 @@ var Verbose bool
 
 // LogWriter can be overwritten by tests to suppress log output
 var LogWriter io.Writer = os.Stdout
+
+// Level represents a logging level
+type Level string
+
+// Log Levels
+const (
+	LevelInfo    Level = "INFO"
+	LevelWarning Level = "WARNING"
+	LevelError   Level = "ERROR"
+	LevelDebug   Level = "DEBUG"
+)
 
 var infoLogger, warningLogger, errorLogger, debugLogger *logger
 
@@ -27,14 +37,27 @@ const (
 )
 
 func init() {
-	infoLogger = &logger{"INFO", infoColor}
-	warningLogger = &logger{"WARNING", warningColor}
-	errorLogger = &logger{"ERROR", errorColor}
-	debugLogger = &logger{"DEBUG", debugColor}
+	infoLogger = &logger{
+		prefix: LevelInfo,
+		color:  infoColor,
+	}
+	warningLogger = &logger{
+		prefix: LevelWarning,
+		color:  warningColor,
+	}
+	errorLogger = &logger{
+		prefix: LevelError,
+		color:  errorColor,
+	}
+	debugLogger = &logger{
+		prefix: LevelDebug,
+		color:  debugColor,
+	}
 }
 
 type logger struct {
-	prefix, color string
+	prefix Level
+	color  string
 }
 
 func (l *logger) getPrefix() string {
@@ -61,18 +84,6 @@ func (l *logger) Printf(fstr string, args ...interface{}) {
 	l.seedLine()
 	line := fmt.Sprintf(fstr, args...)
 	fmt.Fprintf(LogWriter, boldColor, line)
-}
-
-// TailReader will follow the given reader and send its contents
-// to a dedicated logger configured with the given prefix.
-// TODO: Make color configurable
-func TailReader(prefix string, rdr io.Reader) {
-	l := &logger{prefix, infoColor}
-	scanner := bufio.NewScanner(rdr)
-	for scanner.Scan() {
-		text := scanner.Text()
-		l.Println(strings.TrimSpace(text))
-	}
 }
 
 // Info is the equivalent of a log.Println on the info logger.
@@ -127,12 +138,27 @@ func Debugf(fstr string, args ...interface{}) {
 	}
 }
 
-// DebugReader is a convenience method for tailing the contents of a reader
-// to the debug logger.
-func DebugReader(rdr io.Reader) {
+func getLoggerForLevel(level Level) *logger {
+	switch level {
+	case LevelInfo:
+		return infoLogger
+	case LevelWarning:
+		return warningLogger
+	case LevelError:
+		return errorLogger
+	case LevelDebug:
+		return debugLogger
+	}
+	return &logger{prefix: level, color: infoColor}
+}
+
+// LevelReader is a convenience method for tailing the contents of a reader
+// to the logger specified by the given level.
+func LevelReader(level Level, rdr io.Reader) {
+	l := getLoggerForLevel(level)
 	scanner := bufio.NewScanner(rdr)
 	for scanner.Scan() {
 		text := scanner.Text()
-		Debug(strings.TrimSpace(text))
+		l.Println(text)
 	}
 }

@@ -114,8 +114,8 @@ func (n *remoteNode) Execute(opts *types.ExecuteOptions) error {
 	}
 	cmd := buildCmdFromExecOpts(opts)
 	log.Debugf("Executing command on %s: %s\n", n.remoteAddr, redactSecrets(cmd, opts.Secrets))
-	go log.TailReader(opts.LogPrefix, outPipe)
-	go log.TailReader(opts.LogPrefix, errPipe)
+	go log.LevelReader(log.LevelInfo, outPipe)
+	go log.LevelReader(log.LevelError, errPipe)
 	return sess.Run(cmd)
 }
 

@@ -115,7 +115,7 @@ func pullIfNotPresent(cli client.APIClient, image string) error {
 	if err != nil {
 		return err
 	}
-	log.DebugReader(rdr)
+	log.LevelReader(log.LevelDebug, rdr)
 	return nil
 }
 
