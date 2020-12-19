@@ -25,7 +25,7 @@ jobs:
         run: sudo apt-get install -y upx
 
       - name: Build Release
-        run: make dist
+        run: COMPRESSION=9 make dist
 
       - name: Publish Release Artifacts
         uses: softprops/action-gh-release@v1
