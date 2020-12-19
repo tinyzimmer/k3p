@@ -1,8 +1,8 @@
 package cache
 
 import (
-	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -81,15 +81,22 @@ func (h *httpCache) Clean() error {
 	return os.RemoveAll(h.cacheDir)
 }
 
+func (h *httpCache) cachePathForURL(url string) (string, error) {
+	cacheName, err := util.CalculateSHA256Sum(strings.NewReader(url))
+	if err != nil {
+		return "", err
+	}
+	return path.Join(h.cacheDir, cacheName), nil
+}
+
 func (h *httpCache) GetIfOlder(url string, dur time.Duration) (io.ReadCloser, error) {
 	// If cache is setup check it first
 	if !NoCache && h.cacheDir != "" {
 		log.Debugf("Checking local cache for the contents of %q\n", url)
-		cacheName, err := util.CalculateSHA256Sum(strings.NewReader(url))
+		cachePath, err := h.cachePathForURL(url)
 		if err != nil {
 			return nil, err
 		}
-		cachePath := path.Join(h.cacheDir, cacheName)
 		if fileExists(cachePath) {
 			if dur > 0 {
 				stat, err := os.Stat(cachePath)
@@ -97,8 +104,10 @@ func (h *httpCache) GetIfOlder(url string, dur time.Duration) (io.ReadCloser, er
 					return nil, err
 				}
 				if stat.ModTime().Add(dur).After(time.Now()) {
+					log.Debugf("Serving request from local cached item %q\n", cachePath)
 					return os.Open(cachePath)
 				}
+				log.Debugf("Cached item for %q is older than %v\n", url, dur)
 			} else {
 				log.Debugf("Serving request from local cached item %q\n", cachePath)
 				return os.Open(cachePath)
@@ -112,6 +121,14 @@ func (h *httpCache) GetIfOlder(url string, dur time.Duration) (io.ReadCloser, er
 	if err != nil {
 		return nil, err
 	}
+	if resp.StatusCode != http.StatusOK {
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("error retrieving %q: %s", url, string(body))
+	}
 
 	// If the cache is not configured, return the raw response body
 	// so it can be closed properly by the caller.
@@ -120,29 +137,26 @@ func (h *httpCache) GetIfOlder(url string, dur time.Duration) (io.ReadCloser, er
 		return resp.Body, nil
 	}
 
-	// setup a tee reader to cache the contents and populate a new buffer for return
-	var buf bytes.Buffer
-	out := ioutil.NopCloser(&buf)
-	tee := io.TeeReader(resp.Body, &buf)
-	defer resp.Body.Close()
-
 	// We have a local cache, save the object for future use
+	defer resp.Body.Close()
 	log.Debug("Calculating filename for new cache object")
-	cacheName, err := util.CalculateSHA256Sum(strings.NewReader(url))
+	cachePath, err := h.cachePathForURL(url)
 	if err != nil {
 		return nil, err
 	}
-	cachePath := path.Join(h.cacheDir, cacheName)
 	log.Debugf("Writing %q to %q\n", url, cachePath)
 	f, err := os.OpenFile(cachePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := io.Copy(f, tee); err != nil {
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		return nil, err
+	}
+	if err := f.Close(); err != nil {
 		return nil, err
 	}
 
-	return out, nil
+	return os.Open(cachePath)
 }
 
 func (h *httpCache) Get(url string) (io.ReadCloser, error) {

@@ -1,21 +1,36 @@
-DIST ?= $(CURDIR)/dist
-BIN ?= $(DIST)/k3p
+DIST   ?= $(CURDIR)/dist
+BIN    ?= $(DIST)/k3p
 GOPATH ?= $(shell go env GOPATH)
-GOBIN ?= $(GOPATH)/bin
-GOOS ?= linux
+GOBIN  ?= $(GOPATH)/bin
+
+GOOS        ?= linux
 CGO_ENABLED ?= 0
 
 GOLANGCI_VERSION ?= v1.33.0
-GOLANGCI_LINT ?= $(GOBIN)/golangci-lint
-GINKGO ?= $(GOBIN)/ginkgo
-GOX ?= $(GOBIN)/gox
+GOLANGCI_LINT    ?= $(GOBIN)/golangci-lint
+GINKGO           ?= $(GOBIN)/ginkgo
+GOX              ?= $(GOBIN)/gox
+UPX              ?= $(shell which upx 2> /dev/null)
 
-LDFLAGS ?= "-X github.com/tinyzimmer/k3p/pkg/build/package/v1.ZstDictionaryB64=`cat '$(CURDIR)/hack/zstDictionary' | base64 --wrap=0` \
-			-X github.com/tinyzimmer/k3p/pkg/version.K3pVersion=`git describe --tags` \
-			-X github.com/tinyzimmer/k3p/pkg/version.K3pCommit=`git rev-parse HEAD`"
+VERSION  ?= $(shell git describe --tags)
+COMMIT   ?= $(shell git rev-parse HEAD)
+ZST_DICT ?= $(CURDIR)/hack/zstDictionary
 
-# Builds the k3p binary
+LDFLAGS ?= "-X github.com/tinyzimmer/k3p/pkg/build/package/v1.ZstDictionaryB64=`cat '$(ZST_DICT)' | base64 --wrap=0` \
+			-X github.com/tinyzimmer/k3p/pkg/version.K3pVersion=$(VERSION) \
+			-X github.com/tinyzimmer/k3p/pkg/version.K3pCommit=$(COMMIT) -s -w"
+
+
 build: $(BIN)
+
+$(BIN):
+	cd cmd/k3p && \
+		CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) \
+		go build -o $(BIN) \
+			-ldflags $(LDFLAGS)
+ifneq ($(UPX),)
+	$(UPX) $(BIN)
+endif
 
 IMG ?= ghcr.io/tinyzimmer/k3p:$(shell git describe --tags)
 docker:
@@ -25,34 +40,30 @@ $(GOX):
 	GO111MODULE=off go get github.com/mitchellh/gox
 
 .PHONY: dist
-COMP_TARGETS ?= "darwin/amd64 linux/amd64 linux/arm linux/arm64 windows/amd64"
-COMP_OUTPUT ?= "$(DIST)/{{.Dir}}_{{.OS}}_{{.Arch}}"
+COMPILE_TARGETS ?= "darwin/amd64 linux/amd64 linux/arm linux/arm64 windows/amd64"
+COMPILE_OUTPUT  ?= "$(DIST)/{{.Dir}}_{{.OS}}_{{.Arch}}"
+COMPRESSION ?= 5
 dist: $(GOX)
 	cd cmd/k3p && \
-		CGO_ENABLED=$(CGO_ENABLED) $(GOX) -osarch $(COMP_TARGETS) --output $(COMP_OUTPUT) -ldflags=$(LDFLAGS)
-	which upx 2> /dev/null && upx $(DIST)/*
+		CGO_ENABLED=$(CGO_ENABLED) $(GOX) -osarch $(COMPILE_TARGETS) --output $(COMPILE_OUTPUT) -ldflags=$(LDFLAGS)
+ifneq ($(UPX),)
+	$(UPX) -$(COMPRESSION) $(DIST)/*
+endif
 
 
 install: $(BIN)
 	mkdir -p $(GOBIN)
 	cp $(BIN) $(GOBIN)/k3p
 
-$(BIN):
-	cd cmd/k3p && \
-		CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) \
-		go build -o $(BIN) \
-			-ldflags $(LDFLAGS)
-	which upx &> /dev/null && upx $(BIN)
-
 docs:
 	go run hack/docgen.go
 
-# Cleans binaries and packages from the repo
 clean:
 	find . -name *.coverprofile -exec rm {} \;
-	rm -rf $(DIST)/
+	find . -name *.tgz -exec rm {} \;
+	find . -name *.run -exec rm {} \;
+	rm -rf $(DIST)
 
-# Linting
 $(GOLANGCI_LINT):
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(GOLANGCI_VERSION)
 
@@ -62,7 +73,7 @@ lint: $(GOLANGCI_LINT)
 $(GINKGO):
 	GO111MODULE=off go get github.com/onsi/ginkgo/ginkgo
 
-TEST_PKG ?= ./...
+TEST_PKG   ?= ./...
 TEST_FLAGS ?=
 test: $(GINKGO)
 	$(GINKGO) \

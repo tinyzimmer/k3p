@@ -23,7 +23,8 @@ var mockCalled bool
 func mockGet(url string) (*http.Response, error) {
 	mockCalled = true
 	return &http.Response{
-		Body: ioutil.NopCloser(strings.NewReader("test")),
+		StatusCode: http.StatusOK,
+		Body:       ioutil.NopCloser(strings.NewReader("test")),
 	}, nil
 }
 

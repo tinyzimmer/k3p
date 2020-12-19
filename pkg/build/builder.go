@@ -290,7 +290,7 @@ func makeRunFile(opts *types.BuildOptions, archive types.Archive) error {
 	go func() {
 		// Need to close no matter what to stop the read outside this goroutine
 		// from blocking
-		defer w.Close()
+		defer func() { errors <- w.Close() }()
 
 		// Create a new tar writer
 		tw := tar.NewWriter(w)
