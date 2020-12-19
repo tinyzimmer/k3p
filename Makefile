@@ -59,9 +59,10 @@ docs:
 	go run hack/docgen.go
 
 clean:
-	find . -name *.coverprofile -exec rm {} \;
-	find . -name *.tgz -exec rm {} \;
-	find . -name *.run -exec rm {} \;
+	find . -name '*.coverprofile' -exec rm {} \;
+	find . -name '*.tgz' -exec rm {} \;
+	find . -name '*.tar' -exec rm {} \;
+	find . -name '*.run' -exec rm {} \;
 	rm -rf $(DIST)
 
 $(GOLANGCI_LINT):
