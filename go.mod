@@ -19,7 +19,8 @@ require (
 	github.com/onsi/gomega v1.10.3
 	github.com/sanylcs/uuencode v0.0.0-20161224062037-797cde56591b
 	github.com/spf13/cobra v1.1.1
-	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
+	golang.org/x/crypto v0.0.0-20201217014255-9d1352758620
+	golang.org/x/sys v0.0.0-20201218084310-7d0127a74742 // indirect
 	golang.org/x/text v0.3.3
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm v2.17.0+incompatible

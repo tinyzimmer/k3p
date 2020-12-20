@@ -63,7 +63,7 @@ func (l *localNode) Execute(opts *types.ExecuteOptions) error {
 		return err
 	}
 	go log.LevelReader(log.LevelInfo, outPipe)
-	go log.LevelReader(log.LevelError, errPipe)
+	go log.LevelReader(log.LevelDebug, errPipe)
 	return c.Run()
 }
 

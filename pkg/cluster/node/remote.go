@@ -115,7 +115,7 @@ func (n *remoteNode) Execute(opts *types.ExecuteOptions) error {
 	cmd := buildCmdFromExecOpts(opts)
 	log.Debugf("Executing command on %s: %s\n", n.remoteAddr, redactSecrets(cmd, opts.Secrets))
 	go log.LevelReader(log.LevelInfo, outPipe)
-	go log.LevelReader(log.LevelError, errPipe)
+	go log.LevelReader(log.LevelDebug, errPipe)
 	return sess.Run(cmd)
 }
 
@@ -133,6 +133,7 @@ func getSSHClient(opts *types.NodeConnectOptions) (*ssh.Client, error) {
 		Auth:            make([]ssh.AuthMethod, 0),
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: obviously this should be reconsidered
 	}
+	config.Config.SetDefaults()
 	if opts.SSHPassword != "" {
 		log.Debug("Using SSH password authentication")
 		config.Auth = append(config.Auth, ssh.Password(opts.SSHPassword))
@@ -150,7 +151,6 @@ func getSSHClient(opts *types.NodeConnectOptions) (*ssh.Client, error) {
 		}
 		config.Auth = append(config.Auth, ssh.PublicKeys(key))
 	}
-
 	addr := net.JoinHostPort(opts.Address, strconv.Itoa(opts.SSHPort))
 	log.Debugf("Creating SSH connection with %s over TCP\n", addr)
 	return ssh.Dial("tcp", addr, config)

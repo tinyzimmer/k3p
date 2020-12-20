@@ -40,7 +40,8 @@ func ReversedHexToIPv4(h string) (net.IP, error) {
 	if len(ipBytes) != 4 {
 		return nil, fmt.Errorf("%s is not a valid ip hex string", h)
 	}
-	return net.IP(RevBytes(ipBytes)), nil
+	rev := RevBytes(ipBytes)
+	return net.IPv4(rev[0], rev[1], rev[2], rev[3]), nil
 }
 
 // IPv4ToReverseHex reverses the given IP address string and encodes it to
