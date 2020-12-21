@@ -42,6 +42,9 @@ type BuildOptions struct {
 	Excludes []string
 	// Don't bundle docker images with the archive
 	ExcludeImages bool
+	// When true, instead of creating a tarball of images that is installed to every agent, a private
+	// registry is built and the package is configured to launch and use it at installation.
+	CreateRegistry bool
 	// The pull policy to use
 	PullPolicy PullPolicy
 	// The path to write the final archive to

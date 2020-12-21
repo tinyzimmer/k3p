@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"os"
 	"path"
 	"strings"
 
@@ -57,7 +58,7 @@ func (b *BaseManifestParser) StripParseDir(s string) string {
 // IsExcluded returns true if the given directory should be excluded from parsing.
 func (b *BaseManifestParser) IsExcluded(dirName string) bool {
 	for _, ex := range b.ExcludeDirs {
-		if ex == path.Base(dirName) {
+		if strings.TrimSuffix(ex, string(os.PathSeparator)) == strings.TrimSuffix(path.Base(dirName), string(os.PathSeparator)) {
 			return true
 		}
 	}

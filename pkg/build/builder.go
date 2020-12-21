@@ -3,6 +3,7 @@ package build
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"html/template"
 	"io"
@@ -11,15 +12,12 @@ import (
 	"strings"
 	"time"
 
-	uu "github.com/sanylcs/uuencode"
-
 	v1 "github.com/tinyzimmer/k3p/pkg/build/package/v1"
 	"github.com/tinyzimmer/k3p/pkg/images"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/parser"
 	"github.com/tinyzimmer/k3p/pkg/types"
 	"github.com/tinyzimmer/k3p/pkg/util"
-	"golang.org/x/text/transform"
 )
 
 // NewBuilder returns a new Builder for the given K3s version and architecture. If tmpDir
@@ -187,7 +185,22 @@ func (b *builder) bundleImages(opts *types.BuildOptions, parser types.ManifestPa
 	}
 
 	log.Info("Detected the following images to bundle with the package:", imageNames)
-	rdr, err := images.NewImageDownloader().PullImages(imageNames, opts.Arch, opts.PullPolicy)
+
+	if opts.CreateRegistry {
+		log.Info("Building private image registry to bundle with the package")
+		artifacts, err := images.NewImageDownloader().BuildRegistry(imageNames, opts.Arch, opts.PullPolicy)
+		if err != nil {
+			return err
+		}
+		for _, artifact := range artifacts {
+			if err := b.writer.Put(artifact); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	rdr, err := images.NewImageDownloader().SaveImages(imageNames, opts.Arch, opts.PullPolicy)
 	if err != nil {
 		return err
 	}
@@ -196,7 +209,6 @@ func (b *builder) bundleImages(opts *types.BuildOptions, parser types.ManifestPa
 	if err != nil {
 		return err
 	}
-
 	return b.writer.Put(images)
 }
 
@@ -209,20 +221,8 @@ cleanup() {
 cleanup
 trap cleanup EXIT
 
-BOLD='\033[1m'
-INFO='\033[0;34m'
-NOTICE='\033[0;36m'
-NC='\033[0m'
-
-info() {
-	echo -en "${NOTICE}{{ .Backtick }}date +'%Y/%m/%d %H:%M:%S'{{ .Backtick }}"
-	echo -en "${INFO}  [INFO]\t${NC}"
-	echo -e "${BOLD}${1}${NC}"
-}
-
-info "Extracting runfile..."
 mkdir -p {{ .DirName }}
-uudecode -o /dev/stdout $0 | tar xf -
+tail -n +30 $0 | tar xzf -
 
 if [ -z ${1} ] || [ "${1}" == "install" ] || [ {{ .Backtick }}echo ${1} | cut -c1-1{{ .Backtick }} = "-" ] ; then
 	if [ "${1}" == "install" ] ; then shift ; fi
@@ -238,6 +238,9 @@ ${cmd} ${@}
 
 exit $?
 
+
+
+#payload
 `))
 
 var (
@@ -283,141 +286,109 @@ func makeRunFile(opts *types.BuildOptions, archive types.Archive) error {
 		return err
 	}
 
-	r, w := io.Pipe()
-	errors := make(chan error)
+	// wrap the rest of the content in gzip
+	gzw := gzip.NewWriter(runFile)
 
-	// kick off a goroutine feeding the tar data to the run file
-	go func() {
-		// Need to close no matter what to stop the read outside this goroutine
-		// from blocking
-		defer func() { errors <- w.Close() }()
+	// Create a new tar writer around the gzip writer
+	tw := tar.NewWriter(gzw)
 
-		// Create a new tar writer
-		tw := tar.NewWriter(w)
+	// get the time
+	now := time.Now()
 
-		// get the time
-		now := time.Now()
+	// downloadURL := fmt.Sprintf("https://github.com/tinyzimmer/k3p/releases/download/%s/k3p_linux_%s", version.K3pVersion, opts.Arch)
+	// bin, err := cache.DefaultCache.Get(downloadURL)
+	// until i open the repo - the releases can't be downloaded - just use the current executable
+	// (which obviously will not always be linux, and it has to be for installations besides docker)
+	ex, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	bin, err := os.Open(ex)
+	if err != nil {
+		return err
+	}
+	binStat, err := os.Stat(ex)
+	if err != nil {
+		return err
+	}
 
-		// downloadURL := fmt.Sprintf("https://github.com/tinyzimmer/k3p/releases/download/%s/k3p_linux_%s", version.K3pVersion, opts.Arch)
-		// bin, err := cache.DefaultCache.Get(downloadURL)
-		// until i open the repo - the releases can't be downloaded - just use the current executable
-		// (which obviously will not always be linux, and it has to be for installations besides docker)
-		ex, err := os.Executable()
+	// Write the k3p binary to the tar ball
+	if err := tw.WriteHeader(&tar.Header{
+		Typeflag: tar.TypeReg,
+		Name:     fmt.Sprintf("%s/%s", runDirName, runK3pBin), // must ensure its a linux path separator
+		Size:     binStat.Size(),
+		Mode:     0755,
+		Uid:      0, Gid: 0,
+		Uname: "root", Gname: "root",
+		ModTime: now, AccessTime: now, ChangeTime: now,
+	}); err != nil {
+		return err
+	}
+
+	if _, err := io.Copy(tw, bin); err != nil {
+		return err
+	}
+	if err := bin.Close(); err != nil {
+		return err
+	}
+
+	// Write the archive to the tar ball
+	rdr := archive.Reader()
+	size := archive.Size()
+	if opts.Compress {
+		// need to compress to a tempfile first
+		tmpFile, err := ioutil.TempFile(util.TempDir, "")
 		if err != nil {
-			errors <- err
-			return
+			return err
 		}
-		bin, err := os.Open(ex)
+		defer os.Remove(tmpFile.Name())
+		compressedReader, err := archive.CompressReader()
 		if err != nil {
-			errors <- err
-			return
+			return err
 		}
-		binStat, err := os.Stat(ex)
+		if _, err := io.Copy(tmpFile, compressedReader); err != nil {
+			return err
+		}
+		if err := tmpFile.Close(); err != nil {
+			return err
+		}
+		stat, err := os.Stat(tmpFile.Name())
 		if err != nil {
-			errors <- err
-			return
+			return err
 		}
-
-		// Write the k3p binary to the tar ball
-		if err := tw.WriteHeader(&tar.Header{
-			Typeflag: tar.TypeReg,
-			Name:     fmt.Sprintf("%s/%s", runDirName, runK3pBin), // must ensure its a linux path separator
-			Size:     binStat.Size(),
-			Mode:     0755,
-			Uid:      0, Gid: 0,
-			Uname: "root", Gname: "root",
-			ModTime: now, AccessTime: now, ChangeTime: now,
-		}); err != nil {
-			errors <- err
-			return
+		// Overwrite the size and the reader
+		size = stat.Size()
+		rdr, err = os.Open(tmpFile.Name())
+		if err != nil {
+			return err
 		}
+	}
+	if err := tw.WriteHeader(&tar.Header{
+		Typeflag: tar.TypeReg,
+		Name:     fmt.Sprintf("%s/%s", runDirName, pkgFile), // must ensure its a linux path separator
+		Size:     size,
+		Mode:     0644,
+		Uid:      0, Gid: 0,
+		Uname: "root", Gname: "root",
+		ModTime: now, AccessTime: now, ChangeTime: now,
+	}); err != nil {
+		return err
+	}
 
-		if _, err := io.Copy(tw, bin); err != nil {
-			errors <- err
-			return
-		}
-		if err := bin.Close(); err != nil {
-			errors <- err
-			return
-		}
+	if _, err := io.Copy(tw, rdr); err != nil {
+		return err
+	}
 
-		// Write the archive to the tar ball
-		rdr := archive.Reader()
-		size := archive.Size()
-		if opts.Compress {
-			// need to compress to a tempfile first
-			tmpFile, err := ioutil.TempFile(util.TempDir, "")
-			if err != nil {
-				errors <- err
-				return
-			}
-			defer os.Remove(tmpFile.Name())
-			compressedReader, err := archive.CompressReader()
-			if err != nil {
-				errors <- err
-				return
-			}
-			if _, err := io.Copy(tmpFile, compressedReader); err != nil {
-				errors <- err
-				return
-			}
-			if err := tmpFile.Close(); err != nil {
-				errors <- err
-				return
-			}
-			stat, err := os.Stat(tmpFile.Name())
-			if err != nil {
-				errors <- err
-				return
-			}
-			// Overwrite the size and the reader
-			size = stat.Size()
-			rdr, err = os.Open(tmpFile.Name())
-			if err != nil {
-				errors <- err
-				return
-			}
-		}
-		if err := tw.WriteHeader(&tar.Header{
-			Typeflag: tar.TypeReg,
-			Name:     fmt.Sprintf("%s/%s", runDirName, pkgFile), // must ensure its a linux path separator
-			Size:     size,
-			Mode:     0644,
-			Uid:      0, Gid: 0,
-			Uname: "root", Gname: "root",
-			ModTime: now, AccessTime: now, ChangeTime: now,
-		}); err != nil {
-			errors <- err
-			return
-		}
+	// Close the tar writer
+	if err := tw.Close(); err != nil {
+		return err
+	}
 
-		if _, err := io.Copy(tw, rdr); err != nil {
-			errors <- err
-			return
-		}
-
-		// Close the tar writer
-		if err := tw.Close(); err != nil {
-			errors <- err
-			return
-		}
-	}()
-
-	e := uu.NewEncode(true, "\r\n")
-
-	// Set the uuencde header
-	e.ResetAll("0644", "run.tar")
-
-	// This will block until the write end of the pipe closes
-	if _, err := io.Copy(runFile, transform.NewReader(r, e)); err != nil {
+	// Close the gzip writer
+	if err := gzw.Close(); err != nil {
 		return err
 	}
 
 	// Close the runfile
-	if err := runFile.Close(); err != nil {
-		return err
-	}
-
-	// return any errors from the goroutine
-	return <-errors
+	return runFile.Close()
 }

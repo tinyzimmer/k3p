@@ -157,13 +157,13 @@ func getLoggerForLevel(level Level) *logger {
 // LevelReader is a convenience method for tailing the contents of a reader
 // to the logger specified by the given level.
 func LevelReader(level Level, rdr io.Reader) {
-	if level == LevelDebug && !Verbose {
-		return
-	}
 	l := getLoggerForLevel(level)
 	scanner := bufio.NewScanner(rdr)
 	for scanner.Scan() {
 		text := scanner.Text()
+		if level == LevelDebug && !Verbose {
+			continue // This function needs to block even if not logging verbosely
+		}
 		l.Println(text)
 	}
 }

@@ -53,6 +53,7 @@ func init() {
 	buildCmd.Flags().BoolVarP(&cache.NoCache, "no-cache", "N", false, "Disable the use of the local cache when downloading assets")
 	buildCmd.Flags().BoolVar(&buildOpts.Compress, "compress", false, "Whether to apply zst encryption to the package, it will usually require the same k3p release to decompress.")
 	buildCmd.Flags().BoolVar(&buildOpts.RunFile, "run-file", false, "Whether to bundle the final archive into a self-installing run file")
+	buildCmd.Flags().BoolVar(&buildOpts.CreateRegistry, "use-registry", false, "Bundle container images into a private registry instead of just raw tar balls")
 
 	buildCmd.MarkFlagDirname("exclude")
 	buildCmd.MarkFlagDirname("manifests")
