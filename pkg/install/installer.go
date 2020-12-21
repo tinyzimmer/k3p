@@ -84,7 +84,10 @@ func (i *installer) Install(target types.Node, pkg types.Package, opts *types.In
 	}
 
 	// Install K3s
-	log.Info("Running k3s installation script")
+	if target.GetType() != types.NodeDocker {
+		// let's not lie to the user when we are doing docker installs
+		log.Info("Running k3s installation script")
+	}
 	return target.Execute(execOpts)
 }
 

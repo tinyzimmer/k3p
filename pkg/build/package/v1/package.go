@@ -30,6 +30,8 @@ const (
 	manifestDir = "manifests"
 	// staticDir is the directory where static assets are stored inside the package
 	staticDir = "static"
+	// etcDir is where etc artifacts are stored inside the package
+	etcDir = "etc"
 	// the tar file we use inside the workdir
 	tarFile = "package.tar"
 )
@@ -214,6 +216,9 @@ func (rw *readWriter) sanitizeMeta() *types.PackageMeta {
 	for _, static := range rw.meta.Manifest.Static {
 		outMeta.Manifest.Static = append(outMeta.Manifest.Static, strings.TrimPrefix(static, staticDir+"/"))
 	}
+	for _, etc := range rw.meta.Manifest.Etc {
+		outMeta.Manifest.Etc = append(outMeta.Manifest.Etc, strings.TrimPrefix(etc, etcDir+"/"))
+	}
 	return outMeta
 }
 
@@ -229,6 +234,8 @@ func (rw *readWriter) appendMeta(t types.ArtifactType, tarPath string) {
 		rw.meta.Manifest.K8sManifests = append(rw.meta.Manifest.K8sManifests, tarPath)
 	case types.ArtifactStatic:
 		rw.meta.Manifest.Static = append(rw.meta.Manifest.Static, tarPath)
+	case types.ArtifactEtc:
+		rw.meta.Manifest.Etc = append(rw.meta.Manifest.Etc, tarPath)
 	case types.ArtifactEULA:
 		rw.meta.Manifest.EULA = tarPath
 	}
@@ -246,6 +253,8 @@ func (rw *readWriter) hasDirPrefix(artifact *types.Artifact) bool {
 		return strings.HasPrefix(artifact.Name, manifestDir)
 	case types.ArtifactStatic:
 		return strings.HasPrefix(artifact.Name, staticDir)
+	case types.ArtifactEtc:
+		return strings.HasPrefix(artifact.Name, etcDir)
 	}
 	return false
 }
@@ -262,6 +271,8 @@ func dirFromType(t types.ArtifactType) string {
 		return manifestDir
 	case types.ArtifactStatic:
 		return staticDir
+	case types.ArtifactEtc:
+		return etcDir
 	}
 	return ""
 }

@@ -118,6 +118,15 @@ func SyncPackageToNode(target types.Node, pkg types.Package, cfg *types.InstallC
 		}
 	}
 
+	if len(meta.Manifest.Etc) > 0 {
+		log.Info("Installing configuration files to", types.K3sEtcDir)
+		for _, etc := range meta.Manifest.Etc {
+			if err := writePkgFileToNode(target, pkg, types.ArtifactEtc, etc, types.K3sEtcDir, "0644", cfg.InstallOptions.Variables); err != nil {
+				return err
+			}
+		}
+	}
+
 	out, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err

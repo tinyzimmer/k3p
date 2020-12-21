@@ -12,6 +12,8 @@ type Manifest struct {
 	K8sManifests []string `json:"k8sManifests,omitempty"`
 	// Static assets
 	Static []string `json:"static,omitempty"`
+	// Etc assets
+	Etc []string `json:"etc,omitempty"`
 	// The End User License Agreement for the package, or an empty string if there is none
 	EULA string `json:"eula,omitempty"`
 }
@@ -24,6 +26,7 @@ func (m *Manifest) DeepCopy() *Manifest {
 		Images:       make([]string, len(m.Images)),
 		K8sManifests: make([]string, len(m.K8sManifests)),
 		Static:       make([]string, len(m.Static)),
+		Etc:          make([]string, len(m.Etc)),
 		EULA:         m.EULA,
 	}
 	copy(out.Bins, m.Bins)
@@ -31,6 +34,7 @@ func (m *Manifest) DeepCopy() *Manifest {
 	copy(out.Images, m.Images)
 	copy(out.K8sManifests, m.K8sManifests)
 	copy(out.Static, m.Static)
+	copy(out.Etc, m.Etc)
 	return out
 }
 
@@ -44,5 +48,7 @@ func NewEmptyManifest() *Manifest {
 		Scripts:      make([]string, 0),
 		Images:       make([]string, 0),
 		K8sManifests: make([]string, 0),
+		Static:       make([]string, 0),
+		Etc:          make([]string, 0),
 	}
 }

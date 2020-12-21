@@ -12,5 +12,5 @@ type ImageDownloader interface {
 	// BuildRegistry should build a container registry with the given images and return a
 	// slice of artifacts to be bundled in a package. The artifacts should usually contain
 	// a container image and manifest for launching it.
-	BuildRegistry(images []string, arch string, pullPolicy PullPolicy) ([]*Artifact, error)
+	BuildRegistry(*BuildRegistryOptions) ([]*Artifact, error)
 }

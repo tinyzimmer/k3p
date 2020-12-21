@@ -45,6 +45,9 @@ const K3sScriptsDir = "/usr/local/bin/k3p-scripts"
 // K3sBinDir is the directory where binaries are installed to the system.
 const K3sBinDir = "/usr/local/bin"
 
+// K3sEtcDir is the directory where configuration files are stored for k3s.
+const K3sEtcDir = "/etc/rancher/k3s"
+
 // K3sKubeconfig is the path where the admin kubeconfig is stored on the system.
 const K3sKubeconfig = "/etc/rancher/k3s/k3s.yaml"
 
@@ -87,8 +90,10 @@ const (
 	ArtifactScript ArtifactType = "script"
 	// ArtifactManifest represents a kubernetes manifest artifact.
 	ArtifactManifest ArtifactType = "manifest"
-	// ArtifactStatic represents static content to be hosted by the api server
+	// ArtifactStatic represents static content to be hosted by the api server.
 	ArtifactStatic ArtifactType = "static"
 	// ArtifactEULA represents an End User License Agreement.
 	ArtifactEULA ArtifactType = "eula"
+	// ArtifactEtc is an artifact to be placed in /etc/rancher/k3s.
+	ArtifactEtc ArtifactType = "etc"
 )

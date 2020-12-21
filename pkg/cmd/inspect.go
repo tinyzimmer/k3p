@@ -137,6 +137,16 @@ var inspectCmd = &cobra.Command{
 		}
 
 		fmt.Println()
+		fmt.Println("  CONFIGS")
+		for _, e := range meta.Manifest.Etc {
+			artifact := &types.Artifact{Type: types.ArtifactEtc, Name: e}
+			if err := pkg.Get(artifact); err != nil {
+				return err
+			}
+			fmt.Println("    ", artifact.Name, "\t", byteCountSI(artifact.Size))
+		}
+
+		fmt.Println()
 		fmt.Println("  IMAGES")
 		if inspectDetails {
 			fmt.Println()

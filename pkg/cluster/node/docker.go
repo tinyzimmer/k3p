@@ -62,17 +62,27 @@ func NewDocker(opts *types.DockerNodeOptions) (types.Node, error) {
 	}
 
 	// Create a volume for k3s assets
-	volCreateBody := volume.VolumeCreateBody{
+	varVolCreateBody := volume.VolumeCreateBody{
 		Driver:     "local",
 		DriverOpts: map[string]string{},
 		Labels:     opts.GetLabels(),
 		Name:       opts.GetNodeName(),
 	}
-	log.Info("Creating docker volume", volCreateBody.Name)
-	log.Debugf("VolumeCreateBody: %+v\n", volCreateBody)
-	vol, err := cli.VolumeCreate(context.TODO(), volCreateBody)
-	if err != nil {
-		return nil, err
+	etcVolCreateBody := volume.VolumeCreateBody{
+		Driver:     "local",
+		DriverOpts: map[string]string{},
+		Labels:     opts.GetLabels(),
+		Name:       fmt.Sprintf("%s-etc", opts.GetNodeName()),
+	}
+	volNames := make([]string, 2)
+	for i, volCreateBody := range []volume.VolumeCreateBody{varVolCreateBody, etcVolCreateBody} {
+		log.Info("Creating docker volume", volCreateBody.Name)
+		log.Debugf("VolumeCreateBody: %+v\n", volCreateBody)
+		vol, err := cli.VolumeCreate(context.TODO(), volCreateBody)
+		if err != nil {
+			return nil, err
+		}
+		volNames[i] = vol.Name
 	}
 
 	// We at first just use a busybox container with a persistent volume to serve
@@ -82,12 +92,16 @@ func NewDocker(opts *types.DockerNodeOptions) (types.Node, error) {
 		return nil, err
 	}
 	hostConfig := &container.HostConfig{
-		Binds: []string{fmt.Sprintf("%s:%s", vol.Name, types.K3sRootConfigDir)},
+		Binds: []string{
+			fmt.Sprintf("%s:%s", volNames[0], types.K3sRootConfigDir),
+			fmt.Sprintf("%s:%s", volNames[1], types.K3sEtcDir),
+		},
 	}
 	busyboxConfig := &container.Config{
 		Image: "busybox:latest",
 		Volumes: map[string]struct{}{
 			types.K3sRootConfigDir: struct{}{},
+			types.K3sEtcDir:        struct{}{},
 		},
 		Labels: opts.GetComponentLabels("busybox"),
 		Cmd:    strslice.StrSlice([]string{"tail", "-f", "/dev/null"}),
@@ -185,7 +199,7 @@ func (d *Docker) WriteFile(rdr io.ReadCloser, destination string, mode string, s
 	defer rdr.Close()
 
 	// stupid hack to only care about actual runtime files
-	if !strings.HasPrefix(destination, types.K3sRootConfigDir) {
+	if !strings.HasPrefix(destination, types.K3sRootConfigDir) && !strings.HasPrefix(destination, types.K3sEtcDir) {
 		return nil
 	}
 	if err := d.MkdirAll(path.Dir(destination)); err != nil {
@@ -300,7 +314,12 @@ func (d *Docker) RemoveAll() error {
 	}); err != nil {
 		return err
 	}
-	return d.cli.VolumeRemove(context.TODO(), d.opts.GetNodeName(), true)
+	for _, vol := range []string{d.opts.GetNodeName(), fmt.Sprintf("%s-etc", d.opts.GetNodeName())} {
+		if err := d.cli.VolumeRemove(context.TODO(), vol, true); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // IsK3sRunning is a special method implemented by the Docker object to determine if a node is already

@@ -5,55 +5,80 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 	"github.com/tinyzimmer/k3p/pkg/util"
 )
 
-// NewImageDownloader returns a new interface for downloading and exporting container
-// images.
-func NewImageDownloader() types.ImageDownloader {
-	return &dockerImageDownloader{}
-}
+const kubenabImage = "docker.bintray.io/kubenab:0.3.4"
 
-type dockerImageDownloader struct{}
+var requiredRegistryImages = []string{"registry:2", "busybox", kubenabImage}
 
-func (d *dockerImageDownloader) SaveImages(images []string, arch string, pullPolicy types.PullPolicy) (io.ReadCloser, error) {
+func (d *dockerImageDownloader) BuildRegistry(opts *types.BuildRegistryOptions) ([]*types.Artifact, error) {
 	cli, err := getDockerClient()
 	if err != nil {
 		return nil, err
 	}
 	defer cli.Close()
 
-	images = sanitizeImageNameSlice(images)
-	for _, image := range images {
-		if err := ensureImagePulled(cli, image, arch, pullPolicy); err != nil {
-			return nil, err
-		}
+	// Generate a secret if one is not provided
+	if opts.RegistrySecret == "" {
+		opts.RegistrySecret = util.GenerateToken(16)
 	}
 
-	log.Debug("Saving images:", images)
-	return cli.ImageSave(context.TODO(), images)
-}
-
-func (d *dockerImageDownloader) BuildRegistry(images []string, arch string, pullPolicy types.PullPolicy) ([]*types.Artifact, error) {
-	cli, err := getDockerClient()
+	// Generate certificates for the registry
+	// TODO: Allow user to supply certificates
+	log.Info("Generating PKI for registry TLS")
+	caCert, caPriv, err := generateCACertificate(opts.Name)
 	if err != nil {
 		return nil, err
 	}
-	defer cli.Close()
+	registryCert, registryPriv, err := generateRegistryCertificate(caCert, caPriv, opts.Name)
+	if err != nil {
+		return nil, err
+	}
+	caCertPem, _, err := encodeToPEM(caCert, caPriv)
+	if err != nil {
+		return nil, err
+	}
+	registryCertPEM, registryKeyPEM, err := encodeToPEM(registryCert, registryPriv)
+	if err != nil {
+		return nil, err
+	}
+
+	caCertificate := &types.Artifact{
+		Type: types.ArtifactEtc,
+		Name: "registry-ca.crt",
+		Body: ioutil.NopCloser(bytes.NewReader(caCertPem)),
+		Size: int64(len(caCertPem)),
+	}
+
+	// Generate htpasswd file for the registry
+	log.Info("Generating secrets for registry authentication")
+	passwordBytes, err := bcrypt.GenerateFromPassword([]byte(opts.RegistrySecret), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+	htpasswd := append([]byte("registry:"), passwordBytes...)
+	htpasswd = append(htpasswd, []byte("\n")...)
 
 	// Create a manifest for the registry
 	log.Info("Generating kubernetes manifests for the private registry")
 	var buf bytes.Buffer
-	err = registryTmpl.Execute(&buf, nil)
+	err = registryTmpl.Execute(&buf, map[string]string{
+		"TLSCertificate":       string(registryCertPEM),
+		"TLSPrivateKey":        string(registryKeyPEM),
+		"TLSCACertificate":     string(caCertPem),
+		"RegistryAuthHtpasswd": string(htpasswd),
+		"KubenabImage":         kubenabImage,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -65,10 +90,32 @@ func (d *dockerImageDownloader) BuildRegistry(images []string, arch string, pull
 		Size: int64(len(body)),
 	}
 
-	log.Info("Starting local private image registry")
-	if err := ensureImagePulled(cli, "registry:2", arch, pullPolicy); err != nil {
+	// Generate a registries.yaml
+	var yamlBuf bytes.Buffer
+	err = registriesYamlTmpl.Execute(&yamlBuf, map[string]string{
+		"Username": "registry",
+		"Password": opts.RegistrySecret,
+	})
+	if err != nil {
 		return nil, err
 	}
+	registriesBody := yamlBuf.Bytes()
+	registriesYamlArtifact := &types.Artifact{
+		Type: types.ArtifactEtc,
+		Name: "registries.yaml",
+		Body: ioutil.NopCloser(bytes.NewReader(registriesBody)),
+		Size: int64(len(registriesBody)),
+	}
+
+	// Ensure all needed images are present
+	userImages := sanitizeImageNameSlice(opts.Images)
+	for _, img := range append(requiredRegistryImages, userImages...) {
+		if err := ensureImagePulled(cli, img, opts.Arch, opts.PullPolicy); err != nil {
+			return nil, err
+		}
+	}
+
+	log.Info("Starting local private image registry")
 	registryContainerConfig, registryHostConfig := registryContainerConfigs()
 	log.Debugf("Registry container config: %+v\n", registryContainerConfig)
 	log.Debugf("Registry host config: %+v\n", registryHostConfig)
@@ -92,13 +139,12 @@ func (d *dockerImageDownloader) BuildRegistry(images []string, arch string, pull
 		return nil, err
 	}
 	log.Debugf("Local private registry is exposed on port %s\n", localPort)
+	if err := waitForLocalRegistry(localPort, time.Second*10); err != nil {
+		return nil, err
+	}
 
-	// Proxy images into the registry
-	images = sanitizeImageNameSlice(images)
-	for _, image := range images {
-		if err := ensureImagePulled(cli, image, arch, pullPolicy); err != nil {
-			return nil, err
-		}
+	// Proxy user images into the registry
+	for _, image := range userImages {
 		log.Infof("Pushing %s to private registry\n", image)
 		localImageName := fmt.Sprintf("localhost:%s/%s", localPort, image)
 		log.Debug("Using local image name", localImageName)
@@ -118,9 +164,6 @@ func (d *dockerImageDownloader) BuildRegistry(images []string, arch string, pull
 	// Mount registry volumes into busybox image to take backup and commit the contents
 	// to an image that can be used as an init container.
 	log.Info("Exporting private registry contents to container image")
-	if err := ensureImagePulled(cli, "busybox", arch, pullPolicy); err != nil {
-		return nil, err
-	}
 	busyboxConfig, busyboxHostConfig := registryVolumeContainerConfigs(registryID)
 	log.Debugf("Busybox container config: %+v\n", busyboxConfig)
 	log.Debugf("Busybox host config: %+v\n", busyboxHostConfig)
@@ -168,8 +211,8 @@ func (d *dockerImageDownloader) BuildRegistry(images []string, arch string, pull
 		return nil, err
 	}
 
-	// Save registry images
-	rdr, err := cli.ImageSave(context.TODO(), []string{"private-registry-data:latest", "registry:2"})
+	// Save all images for the registry
+	rdr, err := cli.ImageSave(context.TODO(), append(requiredRegistryImages, "private-registry-data:latest"))
 	if err != nil {
 		return nil, err
 	}
@@ -180,5 +223,5 @@ func (d *dockerImageDownloader) BuildRegistry(images []string, arch string, pull
 		return nil, err
 	}
 
-	return []*types.Artifact{deploymentManifest, registryArtifact}, err
+	return []*types.Artifact{caCertificate, registriesYamlArtifact, deploymentManifest, registryArtifact}, err
 }

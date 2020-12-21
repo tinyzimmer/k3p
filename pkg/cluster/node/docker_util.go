@@ -253,7 +253,10 @@ func translateOptsToConfigs(opts *types.DockerNodeOptions, execOpts *types.Execu
 		hostConfig.Privileged = true
 		hostConfig.SecurityOpt = []string{"label=disable"}
 		hostConfig.Init = &[]bool{true}[0]
-		hostConfig.Binds = []string{fmt.Sprintf("%s:%s", opts.GetNodeName(), types.K3sRootConfigDir)}
+		hostConfig.Binds = []string{
+			fmt.Sprintf("%s:%s", opts.GetNodeName(), types.K3sRootConfigDir),
+			fmt.Sprintf("%s-etc:%s", opts.GetNodeName(), types.K3sEtcDir),
+		}
 		hostConfig.Tmpfs = map[string]string{
 			"/run":     "",
 			"/var/run": "",
@@ -270,6 +273,7 @@ func translateOptsToConfigs(opts *types.DockerNodeOptions, execOpts *types.Execu
 	if opts.NodeRole != types.K3sRoleLoadBalancer {
 		containerConfig.Volumes = map[string]struct{}{
 			types.K3sRootConfigDir: struct{}{},
+			types.K3sEtcDir:        struct{}{},
 		}
 	}
 	networkConfig := &network.NetworkingConfig{

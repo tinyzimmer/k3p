@@ -1,10 +1,19 @@
 package images
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"errors"
 	"fmt"
+	"math/big"
+	"net/http"
 	"strings"
-	"text/template"
+	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -16,63 +25,6 @@ import (
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 )
-
-var registryTmpl = template.Must(template.New("").Parse(`---
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: private-registry
-  namespace: kube-system
-  labels:
-    app: private-registry
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: private-registry
-  template:
-    metadata:
-      labels:
-        app: private-registry
-    spec:
-      priorityClassName: system-cluster-critical
-      volumes:
-        - name: registry-data
-          emptyDir: {}
-      initContainers:
-        - name: data-extractor
-          image: private-registry-data:latest
-          imagePullPolicy: Never
-          command: ['tar', '-xvz', '--file=/var/registry-data.tgz', '--directory=/var/lib/registry']
-          volumeMounts:
-            - name: registry-data
-              mountPath: /var/lib/registry
-      containers:
-        - name: private-registry
-          image: registry:2
-          imagePullPolicy: Never
-          ports:
-            - containerPort: 5000
-          volumeMounts:
-            - name: registry-data
-              mountPath: /var/lib/registry
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: private-registry
-  namespace: kube-system
-  labels:
-    app: private-registry
-spec:
-  type: LoadBalancer
-  selector:
-    app: private-registry
-  ports:
-    - port: 5000
-      protocol: TCP
-      targetPort: 5000
-`))
 
 func getDockerClient() (*client.Client, error) {
 	return client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -210,4 +162,107 @@ func getHostPortForContainer(cli *client.Client, containerID string, portProto s
 	}
 	localPort := localPortMap[0].HostPort
 	return localPort, nil
+}
+
+func generateCACertificate(name string) (*x509.Certificate, *rsa.PrivateKey, error) {
+	// Generate a 4096-bit RSA private key
+	caPriv, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return nil, nil, err
+	}
+	caCert := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName:   fmt.Sprintf("%s-registry-ca", strings.Replace(name, "_", "-", -1)),
+			Organization: []string{fmt.Sprintf("private-registry")},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Hour * 24 * 365 * 10), // 10 years - obviously needs to be handled better
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+	caDerBytes, err := x509.CreateCertificate(rand.Reader, caCert, caCert, caPriv.Public(), caPriv)
+	if err != nil {
+		return nil, nil, err
+	}
+	caCertSigned, err := x509.ParseCertificate(caDerBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	return caCertSigned, caPriv, nil
+}
+
+func generateRegistryCertificate(caCert *x509.Certificate, caKey *rsa.PrivateKey, name string) (*x509.Certificate, *rsa.PrivateKey, error) {
+	priv, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return nil, nil, err
+	}
+	cert := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName:   fmt.Sprintf("%s-private-registry", strings.Replace(name, "_", "-", -1)),
+			Organization: []string{fmt.Sprintf("private-registry")},
+		},
+		DNSNames:              []string{"localhost", "kubenab.kube-system.svc"},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Hour * 24 * 365 * 10), // 10 years - obviously needs to be handled better
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+	derBytes, err := x509.CreateCertificate(rand.Reader, cert, caCert, priv.Public(), caKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	certSigned, err := x509.ParseCertificate(derBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	return certSigned, priv, nil
+}
+
+func encodeToPEM(rawCert *x509.Certificate, rawKey *rsa.PrivateKey) (cert, key []byte, err error) {
+	var certout bytes.Buffer
+
+	// encode the certificate
+	if err := pem.Encode(&certout, &pem.Block{Type: "CERTIFICATE", Bytes: rawCert.Raw}); err != nil {
+		return nil, nil, err
+	}
+	certBytes := certout.Bytes()
+
+	var keyout bytes.Buffer
+
+	// encode the private key
+	if err := pem.Encode(&keyout, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(rawKey)}); err != nil {
+		return nil, nil, err
+	}
+	keyBytes := keyout.Bytes()
+
+	return certBytes, keyBytes, nil
+}
+
+func waitForLocalRegistry(port string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	client := &http.Client{Timeout: time.Second * 2}
+	for {
+		select {
+		case <-ctx.Done():
+			return errors.New("Time out reached waiting for registry to be ready")
+		default:
+			res, err := client.Get(fmt.Sprintf("http://localhost:%s/v2/_catalog", port))
+			if err != nil {
+				log.Debug("Error waiting for registry to be ready, will retry:", err)
+				continue
+			}
+			if res.StatusCode != http.StatusOK {
+				log.Debug("Non-200 status code from registry catalog, will retry:", err)
+				continue
+			}
+			log.Debug("Local registry is ready")
+			return nil
+		}
+	}
 }
