@@ -76,10 +76,14 @@ func (d *dockerImageDownloader) BuildRegistry(images []string, arch string, pull
 	if err != nil {
 		return nil, err
 	}
-	defer cli.ContainerRemove(context.TODO(), registryID, dockertypes.ContainerRemoveOptions{
-		Force:         true,
-		RemoveVolumes: true,
-	})
+	defer func() {
+		if err := cli.ContainerRemove(context.TODO(), registryID, dockertypes.ContainerRemoveOptions{
+			Force:         true,
+			RemoveVolumes: true,
+		}); err != nil {
+			log.Warning("Error removing registry container:", err)
+		}
+	}()
 
 	// Fetch the host port that was bound to the registry
 	log.Debugf("Inspecting container %s for exposed registry port\n", registryID)
@@ -124,11 +128,14 @@ func (d *dockerImageDownloader) BuildRegistry(images []string, arch string, pull
 	if err != nil {
 		return nil, err
 	}
-	defer cli.ContainerRemove(context.TODO(), volContainerID, dockertypes.ContainerRemoveOptions{
-		Force:         true,
-		RemoveVolumes: true,
-	})
-
+	defer func() {
+		if err := cli.ContainerRemove(context.TODO(), volContainerID, dockertypes.ContainerRemoveOptions{
+			Force:         true,
+			RemoveVolumes: true,
+		}); err != nil {
+			log.Warning("Error removing registry volume container:", err)
+		}
+	}()
 	// Wait for the tar process to finish
 	log.Debug("Waiting for container process to finish")
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second) // make configurable

@@ -186,10 +186,14 @@ func createAndStartContainer(cli *client.Client, containerConfig *container.Conf
 		return "", err
 	}
 	if err := cli.ContainerStart(context.TODO(), cont.ID, dockertypes.ContainerStartOptions{}); err != nil {
-		defer cli.ContainerRemove(context.TODO(), cont.ID, dockertypes.ContainerRemoveOptions{
-			Force:         true,
-			RemoveVolumes: true,
-		})
+		defer func() {
+			if cerr := cli.ContainerRemove(context.TODO(), cont.ID, dockertypes.ContainerRemoveOptions{
+				Force:         true,
+				RemoveVolumes: true,
+			}); cerr != nil {
+				log.Warning("Error removing failed container:", cerr)
+			}
+		}()
 		return "", err
 	}
 	return cont.ID, nil
