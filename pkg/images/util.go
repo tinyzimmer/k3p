@@ -170,11 +170,12 @@ func generateCACertificate(name string) (*x509.Certificate, *rsa.PrivateKey, err
 	if err != nil {
 		return nil, nil, err
 	}
+	fixName := strings.Replace(name, "_", "-", -1)
 	caCert := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
-			CommonName:   fmt.Sprintf("%s-registry-ca", strings.Replace(name, "_", "-", -1)),
-			Organization: []string{fmt.Sprintf("private-registry")},
+			CommonName:   fmt.Sprintf("%s-registry-ca", fixName),
+			Organization: []string{fmt.Sprintf("%s-private-registry", fixName)},
 		},
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(time.Hour * 24 * 365 * 10), // 10 years - obviously needs to be handled better
@@ -199,11 +200,12 @@ func generateRegistryCertificate(caCert *x509.Certificate, caKey *rsa.PrivateKey
 	if err != nil {
 		return nil, nil, err
 	}
+	fixName := strings.Replace(name, "_", "-", -1)
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
-			CommonName:   fmt.Sprintf("%s-private-registry", strings.Replace(name, "_", "-", -1)),
-			Organization: []string{fmt.Sprintf("private-registry")},
+			CommonName:   fmt.Sprintf("%s-private-registry", fixName),
+			Organization: []string{fmt.Sprintf("%s-private-registry", fixName)},
 		},
 		DNSNames:              []string{"localhost", "kubenab.kube-system.svc"},
 		NotBefore:             time.Now(),
