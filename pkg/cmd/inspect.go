@@ -21,41 +21,58 @@ import (
 
 var inspectDetails bool
 var inspectManifest string
+var inspectConfig string
 
 func init() {
 	inspectCmd.Flags().BoolVarP(&inspectDetails, "details", "D", false, "Show additional details on package content")
 	inspectCmd.Flags().StringVarP(&inspectManifest, "manifest", "m", "", "Dump the contents of the specified manifest")
+	inspectCmd.Flags().StringVarP(&inspectConfig, "config", "c", "", "Dump the contents of the specified config file")
 
 	inspectCmd.RegisterFlagCompletionFunc("manifest", completeManifests)
+	inspectCmd.RegisterFlagCompletionFunc("config", completeConfigs)
 
 	rootCmd.AddCommand(inspectCmd)
 }
 
 func completeManifests(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	log.Verbose = false
-
-	var pkgReader io.ReadCloser
-	var err error
-
-	pkgReader, err = os.Open(args[0])
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-
-	if strings.HasSuffix(args[0], ".zst") {
-		pkgReader, err = v1.Decompress(pkgReader)
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
-	}
-
-	pkg, err := v1.Load(pkgReader)
+	pkg, err := getInspectPackage(args[0])
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}
 	defer pkg.Close()
 	manifest := pkg.GetMeta().GetManifest()
 	return manifest.K8sManifests, cobra.ShellCompDirectiveDefault
+}
+
+func completeConfigs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	log.Verbose = false
+	pkg, err := getInspectPackage(args[0])
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+	defer pkg.Close()
+	manifest := pkg.GetMeta().GetManifest()
+	return manifest.Etc, cobra.ShellCompDirectiveDefault
+}
+
+func getInspectPackage(path string) (types.Package, error) {
+	var pkgReader io.ReadCloser
+	var err error
+
+	pkgReader, err = os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	if strings.HasSuffix(path, ".zst") {
+		pkgReader, err = v1.Decompress(pkgReader)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return v1.Load(pkgReader)
 }
 
 var inspectCmd = &cobra.Command{
@@ -66,22 +83,7 @@ var inspectCmd = &cobra.Command{
 		return []string{"tar"}, cobra.ShellCompDirectiveFilterFileExt
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var pkgReader io.ReadCloser
-		var err error
-
-		pkgReader, err = os.Open(args[0])
-		if err != nil {
-			return err
-		}
-
-		if strings.HasSuffix(args[0], ".zst") {
-			pkgReader, err = v1.Decompress(pkgReader)
-			if err != nil {
-				return err
-			}
-		}
-
-		pkg, err := v1.Load(pkgReader)
+		pkg, err := getInspectPackage(args[0])
 		if err != nil {
 			return err
 		}
@@ -93,6 +95,23 @@ var inspectCmd = &cobra.Command{
 			artifact := &types.Artifact{
 				Type: types.ArtifactManifest,
 				Name: inspectManifest,
+			}
+			if err := pkg.Get(artifact); err != nil {
+				return err
+			}
+			defer artifact.Body.Close()
+			body, err := ioutil.ReadAll(artifact.Body)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(body))
+			return nil
+		}
+
+		if inspectConfig != "" {
+			artifact := &types.Artifact{
+				Type: types.ArtifactEtc,
+				Name: inspectConfig,
 			}
 			if err := pkg.Get(artifact); err != nil {
 				return err

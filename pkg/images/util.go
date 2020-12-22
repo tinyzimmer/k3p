@@ -260,7 +260,7 @@ func waitForLocalRegistry(port string, timeout time.Duration) error {
 				continue
 			}
 			if res.StatusCode != http.StatusOK {
-				log.Debug("Non-200 status code from registry catalog, will retry:", err)
+				log.Debug("Non-200 status code from registry catalog, will retry:", res.StatusCode)
 				continue
 			}
 			log.Debug("Local registry is ready")

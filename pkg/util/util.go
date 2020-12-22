@@ -32,8 +32,11 @@ var TempDir = os.TempDir()
 // the system default, or user-configured path.
 func GetTempDir() (string, error) { return ioutil.TempDir(TempDir, "") }
 
-// GetRandomName returns a random name using the docker name generator
-func GetRandomName() string { return namesgenerator.GetRandomName(0) }
+// GetRandomName returns a random name using the docker name generator. Underscores are converted
+// to hyphens for parity with most other strings.
+func GetRandomName() string {
+	return strings.Replace(namesgenerator.GetRandomName(0), "_", "-", -1)
+}
 
 // CalculateSHA256Sum calculates the sha256sum of the contents of the given reader.
 func CalculateSHA256Sum(rdr io.Reader) (string, error) {

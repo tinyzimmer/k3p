@@ -7,15 +7,7 @@ import (
 	"github.com/tinyzimmer/k3p/pkg/log"
 )
 
-var (
-	uninstallName string
-)
-
 func init() {
-	uninstallCmd.Flags().StringVarP(&uninstallName, "name", "n", "", "The name of the package to uninstall (required for docker)")
-	uninstallCmd.MarkFlagRequired("name")
-	uninstallCmd.RegisterFlagCompletionFunc("name", completeClusters)
-
 	rootCmd.AddCommand(uninstallCmd)
 }
 
@@ -29,9 +21,12 @@ func completeClusters(cmd *cobra.Command, args []string, toComplete string) ([]s
 }
 
 var uninstallCmd = &cobra.Command{
-	Use:   "uninstall",
-	Short: "Uninstall a k3p package (currently only for docker)",
+	Use:               "uninstall",
+	Short:             "Uninstall a k3p package (currently only for docker)",
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeClusters,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		uninstallName := args[0]
 		nodes, err := node.LoadDockerCluster(uninstallName)
 		if err != nil {
 			return err

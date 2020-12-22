@@ -190,9 +190,11 @@ func (b *builder) bundleImages(opts *types.BuildOptions, parser types.ManifestPa
 		log.Info("Building private image registry to bundle with the package")
 		artifacts, err := images.NewImageDownloader().BuildRegistry(&types.BuildRegistryOptions{
 			Name:       opts.Name,
+			AppVersion: opts.BuildVersion,
 			Arch:       opts.Arch,
 			Images:     imageNames,
 			PullPolicy: opts.PullPolicy,
+			// TODO: Make more configurable
 		})
 		if err != nil {
 			return err

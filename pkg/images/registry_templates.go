@@ -10,10 +10,10 @@ var registriesYamlTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()
 mirrors:
   registry.private:
     endpoint:
-      - https://localhost:30100
+      - https://localhost:{{ .RegistryNodePort }}
 
 configs:
-  "localhost:30100":
+  "localhost:{{ .RegistryNodePort }}":
     auth:
       username: {{ .Username }}
       password: {{ .Password }}
@@ -88,7 +88,7 @@ spec:
               secretName: registry-htpasswd
       initContainers:
         - name: data-extractor
-          image: private-registry-data:latest
+          image: {{ .RegistryDataImage }}
           imagePullPolicy: Never
           command: ['tar', '-xvz', '--file=/var/registry-data.tgz', '--directory=/var/lib/registry']
           volumeMounts:
@@ -178,7 +178,7 @@ spec:
     - port: 5000
       protocol: TCP
       targetPort: 5000
-      nodePort: 30100
+      nodePort: {{ .RegistryNodePort }}
 ---
 apiVersion: v1
 kind: Service

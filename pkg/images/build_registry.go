@@ -21,17 +21,36 @@ const kubenabImage = "docker.bintray.io/kubenab:0.3.4"
 
 var requiredRegistryImages = []string{"registry:2", "busybox", kubenabImage}
 
+func setOptDefaults(opts *types.BuildRegistryOptions) *types.BuildRegistryOptions {
+	if opts.RegistrySecret == "" {
+		opts.RegistrySecret = util.GenerateToken(16)
+	}
+
+	if opts.AppVersion == "" {
+		opts.AppVersion = types.VersionLatest
+	}
+
+	if opts.RegistryNodePort == "" {
+		opts.RegistryNodePort = "30100"
+	}
+
+	if opts.PullPolicy == "" {
+		opts.PullPolicy = types.PullPolicyAlways
+	}
+
+	return opts
+}
+
 func (d *dockerImageDownloader) BuildRegistry(opts *types.BuildRegistryOptions) ([]*types.Artifact, error) {
+	opts = setOptDefaults(opts)
+
 	cli, err := getDockerClient()
 	if err != nil {
 		return nil, err
 	}
 	defer cli.Close()
 
-	// Generate a secret if one is not provided
-	if opts.RegistrySecret == "" {
-		opts.RegistrySecret = util.GenerateToken(16)
-	}
+	regDataImgName := fmt.Sprintf("%s-private-registry-data:%s", opts.Name, opts.AppVersion)
 
 	// Generate certificates for the registry
 	// TODO: Allow user to supply certificates
@@ -78,6 +97,8 @@ func (d *dockerImageDownloader) BuildRegistry(opts *types.BuildRegistryOptions) 
 		"TLSCACertificate":     string(caCertPem),
 		"RegistryAuthHtpasswd": string(htpasswd),
 		"KubenabImage":         kubenabImage,
+		"RegistryDataImage":    regDataImgName,
+		"RegistryNodePort":     opts.RegistryNodePort,
 	})
 	if err != nil {
 		return nil, err
@@ -85,7 +106,7 @@ func (d *dockerImageDownloader) BuildRegistry(opts *types.BuildRegistryOptions) 
 	body := buf.Bytes()
 	deploymentManifest := &types.Artifact{
 		Type: types.ArtifactManifest,
-		Name: "private-registry-deployment.yaml",
+		Name: fmt.Sprintf("%s-private-registry-deployment.yaml", opts.Name),
 		Body: ioutil.NopCloser(bytes.NewReader(body)),
 		Size: int64(len(body)),
 	}
@@ -93,8 +114,9 @@ func (d *dockerImageDownloader) BuildRegistry(opts *types.BuildRegistryOptions) 
 	// Generate a registries.yaml
 	var yamlBuf bytes.Buffer
 	err = registriesYamlTmpl.Execute(&yamlBuf, map[string]string{
-		"Username": "registry",
-		"Password": opts.RegistrySecret,
+		"Username":         "registry",
+		"Password":         opts.RegistrySecret,
+		"RegistryNodePort": opts.RegistryNodePort,
 	})
 	if err != nil {
 		return nil, err
@@ -206,13 +228,13 @@ func (d *dockerImageDownloader) BuildRegistry(opts *types.BuildRegistryOptions) 
 	}
 
 	// Commit the registry volume container to an image
-	_, err = cli.ContainerCommit(context.TODO(), volContainerID, dockertypes.ContainerCommitOptions{Reference: "private-registry-data:latest"})
+	_, err = cli.ContainerCommit(context.TODO(), volContainerID, dockertypes.ContainerCommitOptions{Reference: regDataImgName})
 	if err != nil {
 		return nil, err
 	}
 
 	// Save all images for the registry
-	rdr, err := cli.ImageSave(context.TODO(), append(requiredRegistryImages, "private-registry-data:latest"))
+	rdr, err := cli.ImageSave(context.TODO(), append(requiredRegistryImages, regDataImgName))
 	if err != nil {
 		return nil, err
 	}
@@ -223,5 +245,5 @@ func (d *dockerImageDownloader) BuildRegistry(opts *types.BuildRegistryOptions) 
 		return nil, err
 	}
 
-	return []*types.Artifact{caCertificate, registriesYamlArtifact, deploymentManifest, registryArtifact}, err
+	return []*types.Artifact{caCertificate, registriesYamlArtifact, deploymentManifest, registryArtifact}, nil
 }
