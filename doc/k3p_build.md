@@ -26,6 +26,7 @@ k3p build [flags]
   -o, --output string           The file to save the distribution package to (default "/home/<user>/devel/k3p/package.tar")
       --pull-policy string      The pull policy to use when bundling container images (valid options always,never,ifnotpresent [case-insensitive]) (default "always")
       --run-file                Whether to bundle the final archive into a self-installing run file
+      --use-registry            Bundle container images into a private registry instead of just raw tar balls
   -V, --version string          The version to tag the package (default "latest")
 ```
 

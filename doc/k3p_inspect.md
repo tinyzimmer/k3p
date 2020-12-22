@@ -9,6 +9,7 @@ k3p inspect PACKAGE [flags]
 ### Options
 
 ```
+  -c, --config string     Dump the contents of the specified config file
   -D, --details           Show additional details on package content
   -h, --help              help for inspect
   -m, --manifest string   Dump the contents of the specified manifest

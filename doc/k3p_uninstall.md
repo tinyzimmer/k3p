@@ -9,8 +9,7 @@ k3p uninstall [flags]
 ### Options
 
 ```
-  -h, --help          help for uninstall
-  -n, --name string   The name of the package to uninstall (required for docker)
+  -h, --help   help for uninstall
 ```
 
 ### Options inherited from parent commands
