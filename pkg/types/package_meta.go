@@ -17,6 +17,8 @@ type PackageMeta struct {
 	K3sVersion string `json:"k3sVersion,omitempty"`
 	// The architecture the package was built for
 	Arch string `json:"arch,omitempty"`
+	// The format with which images were bundles in the archive.
+	ImageBundleFormat ImageBundleFormat `json:"imageBundleFormat,omitempty"`
 	// A listing of the contents of the package
 	Manifest *Manifest `json:"manifest,omitempty"`
 	// A configuration containing installation variables
@@ -29,12 +31,13 @@ type PackageMeta struct {
 // TODO: DeepCopy functions need to be generated
 func (p *PackageMeta) DeepCopy() *PackageMeta {
 	meta := &PackageMeta{
-		MetaVersion:      p.MetaVersion,
-		Name:             p.Name,
-		Version:          p.Version,
-		K3sVersion:       p.K3sVersion,
-		Arch:             p.Arch,
-		PackageConfigRaw: make([]byte, len(p.PackageConfigRaw)),
+		MetaVersion:       p.MetaVersion,
+		Name:              p.Name,
+		Version:           p.Version,
+		K3sVersion:        p.K3sVersion,
+		Arch:              p.Arch,
+		ImageBundleFormat: p.ImageBundleFormat,
+		PackageConfigRaw:  make([]byte, len(p.PackageConfigRaw)),
 	}
 	copy(meta.PackageConfigRaw, p.PackageConfigRaw)
 	if p.Manifest != nil {
@@ -105,6 +108,13 @@ func (p *PackageMeta) GetManifest() *Manifest { return p.Manifest }
 
 // GetPackageConfig returns the package config if of the package or nil if there is none.
 func (p *PackageMeta) GetPackageConfig() *PackageConfig { return p.PackageConfig }
+
+// GetRegistryImageName returns the name that would have been used for a container image
+// containing the registry contents.
+// TODO: Needing to keep this logic here and BuildRegistryOptions is not a good design probably.
+func (p *PackageMeta) GetRegistryImageName() string {
+	return fmt.Sprintf("%s-private-registry-data:%s", p.Name, p.Version)
+}
 
 // NewEmptyMeta returns a new empty PackageMeta instance.
 func NewEmptyMeta() *PackageMeta {

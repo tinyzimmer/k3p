@@ -58,12 +58,17 @@ func (b *builder) Build(opts *types.BuildOptions) error {
 		log.Info("Latest k3s version is", opts.K3sVersion)
 	}
 
+	imageFormat := types.ImageBundleTar
+	if opts.CreateRegistry {
+		imageFormat = types.ImageBundleRegistry
+	}
 	packageMeta := types.PackageMeta{
-		MetaVersion: "v1",
-		Name:        opts.Name,
-		Version:     opts.BuildVersion,
-		K3sVersion:  opts.K3sVersion,
-		Arch:        opts.Arch,
+		MetaVersion:       "v1",
+		Name:              opts.Name,
+		Version:           opts.BuildVersion,
+		K3sVersion:        opts.K3sVersion,
+		Arch:              opts.Arch,
+		ImageBundleFormat: imageFormat,
 	}
 
 	if opts.ConfigFile != "" {
@@ -186,33 +191,29 @@ func (b *builder) bundleImages(opts *types.BuildOptions, parser types.ManifestPa
 
 	log.Info("Detected the following images to bundle with the package:", imageNames)
 
+	downloader := images.NewImageDownloader()
+
+	var imgRdr io.ReadCloser
 	if opts.CreateRegistry {
 		log.Info("Building private image registry to bundle with the package")
-		artifacts, err := images.NewImageDownloader().BuildRegistry(&types.BuildRegistryOptions{
+		imgRdr, err = downloader.BuildRegistry(&types.BuildRegistryOptions{
 			Name:       opts.Name,
 			AppVersion: opts.BuildVersion,
 			Arch:       opts.Arch,
 			Images:     imageNames,
 			PullPolicy: opts.PullPolicy,
-			// TODO: Make more configurable
 		})
-		if err != nil {
-			return err
-		}
-		for _, artifact := range artifacts {
-			if err := b.writer.Put(artifact); err != nil {
-				return err
-			}
-		}
-		return nil
+	} else {
+		log.Info("Exporting images to tar archives to bundle with the package")
+		// TODO: Switch to opts here as well
+		imgRdr, err = downloader.SaveImages(imageNames, opts.Arch, opts.PullPolicy)
 	}
-
-	rdr, err := images.NewImageDownloader().SaveImages(imageNames, opts.Arch, opts.PullPolicy)
 	if err != nil {
 		return err
 	}
+
 	log.Info("Adding container images to package")
-	images, err := util.ArtifactFromReader(types.ArtifactImages, types.ManifestUserImagesFile, rdr)
+	images, err := util.ArtifactFromReader(types.ArtifactImages, types.ManifestUserImagesFile, imgRdr)
 	if err != nil {
 		return err
 	}

@@ -1,5 +1,7 @@
 package types
 
+import "fmt"
+
 // BuildRegistryOptions are options for configuring an in-cluster private
 // container registry.
 type BuildRegistryOptions struct {
@@ -14,10 +16,9 @@ type BuildRegistryOptions struct {
 	Arch string
 	// Pull policy to use while building the registry
 	PullPolicy PullPolicy
-	// The password to use for authentication to the registry, if this is blank one will
-	// be generated.
-	RegistrySecret string
-	// The node port that the private registry will listen on when installed. Defaults to
-	// 30100.
-	RegistryNodePort string
+}
+
+// RegistryImageName returns the name to use for the image containing the registry contents.
+func (opts *BuildRegistryOptions) RegistryImageName() string {
+	return fmt.Sprintf("%s-private-registry-data:%s", opts.Name, opts.AppVersion)
 }

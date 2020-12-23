@@ -2,14 +2,18 @@ package install
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 	"time"
 
+	"github.com/tinyzimmer/k3p/pkg/images/registry"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
 	"github.com/tinyzimmer/k3p/pkg/util"
@@ -75,6 +79,13 @@ func (i *installer) Install(target types.Node, pkg types.Package, opts *types.In
 		}
 	}
 
+	if meta.ImageBundleFormat == types.ImageBundleRegistry {
+		log.Info("Package was generated with private registry")
+		if err := setupPrivateRegistry(target, meta, opts); err != nil {
+			return err
+		}
+	}
+
 	installedConfig := &types.InstallConfig{InstallOptions: opts}
 	log.Debugf("Built installation config %+v\n", installedConfig)
 
@@ -121,3 +132,63 @@ func promptEULA(eula *types.Artifact, autoAccept bool) error {
 		}
 	}
 }
+
+func setupPrivateRegistry(target types.Node, meta *types.PackageMeta, opts *types.InstallOptions) error {
+	registryManifestPath := path.Join(types.K3sManifestsDir, "private-registry")
+
+	log.Info("Generating PKI for registry TLS")
+	caCert, secrets, err := registry.GenerateRegistryTLSSecrets(meta.GetName())
+	if err != nil {
+		return err
+	}
+	if err := target.WriteFile(nopCloser(caCert), registry.RegistryCAPath, "0644", size(caCert)); err != nil {
+		return err
+	}
+	if err := target.WriteFile(nopCloser(secrets), path.Join(registryManifestPath, "registry-tls-secrets.yaml"), "0644", size(secrets)); err != nil {
+		return err
+	}
+
+	log.Info("Writing secrets for registry authentication")
+	if opts.RegistrySecret == "" {
+		log.Info("Generating password for registry authentication")
+		opts.RegistrySecret = util.GenerateToken(16)
+	}
+	authSecret, err := registry.GenerateRegistryAuthSecret(opts.RegistrySecret)
+	if err != nil {
+		return err
+	}
+	if err := target.WriteFile(nopCloser(authSecret), path.Join(registryManifestPath, "registry-auth-secret.yaml"), "0644", size(authSecret)); err != nil {
+		return err
+	}
+
+	log.Info("Writing deployments and services for the private registry")
+	svcs, err := registry.GenerateRegistryServices(opts.GetRegistryNodePort())
+	if err != nil {
+		return err
+	}
+	deployments, err := registry.GenerateRegistryDeployments(meta.GetRegistryImageName())
+	if err != nil {
+		return err
+	}
+	if err := target.WriteFile(nopCloser(svcs), path.Join(registryManifestPath, "registry-services.yaml"), "0644", size(svcs)); err != nil {
+		return err
+	}
+	if err := target.WriteFile(nopCloser(deployments), path.Join(registryManifestPath, "registry-deployments.yaml"), "0644", size(deployments)); err != nil {
+		return err
+	}
+
+	log.Info("Writing containerd configuration for the private registry")
+	registryConf, err := registry.GenerateRegistriesYaml(opts.RegistrySecret, opts.GetRegistryNodePort())
+	if err != nil {
+		return err
+	}
+	if err := target.WriteFile(nopCloser(registryConf), types.K3sRegistriesYamlPath, "0644", size(registryConf)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func size(b []byte) int64 { return int64(len(b)) }
+
+func nopCloser(b []byte) io.ReadCloser { return ioutil.NopCloser(bytes.NewReader(b)) }

@@ -1,37 +1,25 @@
 package images
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"golang.org/x/crypto/bcrypt"
 
+	"github.com/tinyzimmer/k3p/pkg/images/registry"
 	"github.com/tinyzimmer/k3p/pkg/log"
 	"github.com/tinyzimmer/k3p/pkg/types"
-	"github.com/tinyzimmer/k3p/pkg/util"
 )
 
-const kubenabImage = "docker.bintray.io/kubenab:0.3.4"
-
-var requiredRegistryImages = []string{"registry:2", "busybox", kubenabImage}
+var requiredRegistryImages = []string{"registry:2", "busybox", registry.KubenabImage}
 
 func setOptDefaults(opts *types.BuildRegistryOptions) *types.BuildRegistryOptions {
-	if opts.RegistrySecret == "" {
-		opts.RegistrySecret = util.GenerateToken(16)
-	}
-
 	if opts.AppVersion == "" {
 		opts.AppVersion = types.VersionLatest
-	}
-
-	if opts.RegistryNodePort == "" {
-		opts.RegistryNodePort = "30100"
 	}
 
 	if opts.PullPolicy == "" {
@@ -41,7 +29,7 @@ func setOptDefaults(opts *types.BuildRegistryOptions) *types.BuildRegistryOption
 	return opts
 }
 
-func (d *dockerImageDownloader) BuildRegistry(opts *types.BuildRegistryOptions) ([]*types.Artifact, error) {
+func (d *dockerImageDownloader) BuildRegistry(opts *types.BuildRegistryOptions) (io.ReadCloser, error) {
 	opts = setOptDefaults(opts)
 
 	cli, err := getDockerClient()
@@ -49,85 +37,6 @@ func (d *dockerImageDownloader) BuildRegistry(opts *types.BuildRegistryOptions) 
 		return nil, err
 	}
 	defer cli.Close()
-
-	regDataImgName := fmt.Sprintf("%s-private-registry-data:%s", opts.Name, opts.AppVersion)
-
-	// Generate certificates for the registry
-	// TODO: Allow user to supply certificates
-	log.Info("Generating PKI for registry TLS")
-	caCert, caPriv, err := generateCACertificate(opts.Name)
-	if err != nil {
-		return nil, err
-	}
-	registryCert, registryPriv, err := generateRegistryCertificate(caCert, caPriv, opts.Name)
-	if err != nil {
-		return nil, err
-	}
-	caCertPem, _, err := encodeToPEM(caCert, caPriv)
-	if err != nil {
-		return nil, err
-	}
-	registryCertPEM, registryKeyPEM, err := encodeToPEM(registryCert, registryPriv)
-	if err != nil {
-		return nil, err
-	}
-
-	caCertificate := &types.Artifact{
-		Type: types.ArtifactEtc,
-		Name: "registry-ca.crt",
-		Body: ioutil.NopCloser(bytes.NewReader(caCertPem)),
-		Size: int64(len(caCertPem)),
-	}
-
-	// Generate htpasswd file for the registry
-	log.Info("Generating secrets for registry authentication")
-	passwordBytes, err := bcrypt.GenerateFromPassword([]byte(opts.RegistrySecret), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, err
-	}
-	htpasswd := append([]byte("registry:"), passwordBytes...)
-	htpasswd = append(htpasswd, []byte("\n")...)
-
-	// Create a manifest for the registry
-	log.Info("Generating kubernetes manifests for the private registry")
-	var buf bytes.Buffer
-	err = registryTmpl.Execute(&buf, map[string]string{
-		"TLSCertificate":       string(registryCertPEM),
-		"TLSPrivateKey":        string(registryKeyPEM),
-		"TLSCACertificate":     string(caCertPem),
-		"RegistryAuthHtpasswd": string(htpasswd),
-		"KubenabImage":         kubenabImage,
-		"RegistryDataImage":    regDataImgName,
-		"RegistryNodePort":     opts.RegistryNodePort,
-	})
-	if err != nil {
-		return nil, err
-	}
-	body := buf.Bytes()
-	deploymentManifest := &types.Artifact{
-		Type: types.ArtifactManifest,
-		Name: fmt.Sprintf("%s-private-registry-deployment.yaml", opts.Name),
-		Body: ioutil.NopCloser(bytes.NewReader(body)),
-		Size: int64(len(body)),
-	}
-
-	// Generate a registries.yaml
-	var yamlBuf bytes.Buffer
-	err = registriesYamlTmpl.Execute(&yamlBuf, map[string]string{
-		"Username":         "registry",
-		"Password":         opts.RegistrySecret,
-		"RegistryNodePort": opts.RegistryNodePort,
-	})
-	if err != nil {
-		return nil, err
-	}
-	registriesBody := yamlBuf.Bytes()
-	registriesYamlArtifact := &types.Artifact{
-		Type: types.ArtifactEtc,
-		Name: "registries.yaml",
-		Body: ioutil.NopCloser(bytes.NewReader(registriesBody)),
-		Size: int64(len(registriesBody)),
-	}
 
 	// Ensure all needed images are present
 	userImages := sanitizeImageNameSlice(opts.Images)
@@ -228,22 +137,11 @@ func (d *dockerImageDownloader) BuildRegistry(opts *types.BuildRegistryOptions) 
 	}
 
 	// Commit the registry volume container to an image
-	_, err = cli.ContainerCommit(context.TODO(), volContainerID, dockertypes.ContainerCommitOptions{Reference: regDataImgName})
+	_, err = cli.ContainerCommit(context.TODO(), volContainerID, dockertypes.ContainerCommitOptions{Reference: opts.RegistryImageName()})
 	if err != nil {
 		return nil, err
 	}
 
 	// Save all images for the registry
-	rdr, err := cli.ImageSave(context.TODO(), append(requiredRegistryImages, regDataImgName))
-	if err != nil {
-		return nil, err
-	}
-
-	// Create artifact for registry images
-	registryArtifact, err := util.ArtifactFromReader(types.ArtifactImages, "private-registry.tar", rdr)
-	if err != nil {
-		return nil, err
-	}
-
-	return []*types.Artifact{caCertificate, registriesYamlArtifact, deploymentManifest, registryArtifact}, nil
+	return cli.ImageSave(context.TODO(), append(requiredRegistryImages, opts.RegistryImageName()))
 }

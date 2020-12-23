@@ -39,6 +39,8 @@ var (
 	installDockerOpts      types.DockerClusterOptions
 )
 
+// TODO: Add flags for user to supply registry certs, port, and/or password
+
 func init() {
 
 	var currentUser *user.User

@@ -48,6 +48,9 @@ const K3sBinDir = "/usr/local/bin"
 // K3sEtcDir is the directory where configuration files are stored for k3s.
 const K3sEtcDir = "/etc/rancher/k3s"
 
+// K3sRegistriesYamlPath is the path where the k3s containerd configuration is stored.
+const K3sRegistriesYamlPath = "/etc/rancher/k3s/registries.yaml"
+
 // K3sKubeconfig is the path where the admin kubeconfig is stored on the system.
 const K3sKubeconfig = "/etc/rancher/k3s/k3s.yaml"
 
@@ -65,6 +68,9 @@ const K3pDockerNodeNameLabel = "k3p.io/node-name"
 
 // K3pDockerNodeRoleLabel is the label where the node role is placed.
 const K3pDockerNodeRoleLabel = "k3p.io/node-role"
+
+// DefaultRegistryPort is the default node port used when a package includes a private registry.
+const DefaultRegistryPort = 30100
 
 // K3sRole represents the different roles a machine can take in the cluster
 type K3sRole string
@@ -96,4 +102,15 @@ const (
 	ArtifactEULA ArtifactType = "eula"
 	// ArtifactEtc is an artifact to be placed in /etc/rancher/k3s.
 	ArtifactEtc ArtifactType = "etc"
+)
+
+// ImageBundleFormat declares how the images were bundled in a package. Currently
+// either via raw tar balls, or a pre-loaded private registry.
+type ImageBundleFormat string
+
+const (
+	// ImageBundleTar represents raw image tarballs.
+	ImageBundleTar ImageBundleFormat = "raw"
+	// ImageBundleRegistry represents a pre-loaded private registry.
+	ImageBundleRegistry ImageBundleFormat = "registry"
 )

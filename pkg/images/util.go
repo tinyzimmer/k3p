@@ -1,16 +1,9 @@
 package images
 
 import (
-	"bytes"
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"errors"
 	"fmt"
-	"math/big"
 	"net/http"
 	"strings"
 	"time"
@@ -162,87 +155,6 @@ func getHostPortForContainer(cli *client.Client, containerID string, portProto s
 	}
 	localPort := localPortMap[0].HostPort
 	return localPort, nil
-}
-
-func generateCACertificate(name string) (*x509.Certificate, *rsa.PrivateKey, error) {
-	// Generate a 4096-bit RSA private key
-	caPriv, err := rsa.GenerateKey(rand.Reader, 4096)
-	if err != nil {
-		return nil, nil, err
-	}
-	fixName := strings.Replace(name, "_", "-", -1)
-	caCert := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName:   fmt.Sprintf("%s-registry-ca", fixName),
-			Organization: []string{fmt.Sprintf("%s-private-registry", fixName)},
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(time.Hour * 24 * 365 * 10), // 10 years - obviously needs to be handled better
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-	}
-	caDerBytes, err := x509.CreateCertificate(rand.Reader, caCert, caCert, caPriv.Public(), caPriv)
-	if err != nil {
-		return nil, nil, err
-	}
-	caCertSigned, err := x509.ParseCertificate(caDerBytes)
-	if err != nil {
-		return nil, nil, err
-	}
-	return caCertSigned, caPriv, nil
-}
-
-func generateRegistryCertificate(caCert *x509.Certificate, caKey *rsa.PrivateKey, name string) (*x509.Certificate, *rsa.PrivateKey, error) {
-	priv, err := rsa.GenerateKey(rand.Reader, 4096)
-	if err != nil {
-		return nil, nil, err
-	}
-	fixName := strings.Replace(name, "_", "-", -1)
-	cert := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName:   fmt.Sprintf("%s-private-registry", fixName),
-			Organization: []string{fmt.Sprintf("%s-private-registry", fixName)},
-		},
-		DNSNames:              []string{"localhost", "kubenab.kube-system.svc"},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(time.Hour * 24 * 365 * 10), // 10 years - obviously needs to be handled better
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-	}
-	derBytes, err := x509.CreateCertificate(rand.Reader, cert, caCert, priv.Public(), caKey)
-	if err != nil {
-		return nil, nil, err
-	}
-	certSigned, err := x509.ParseCertificate(derBytes)
-	if err != nil {
-		return nil, nil, err
-	}
-	return certSigned, priv, nil
-}
-
-func encodeToPEM(rawCert *x509.Certificate, rawKey *rsa.PrivateKey) (cert, key []byte, err error) {
-	var certout bytes.Buffer
-
-	// encode the certificate
-	if err := pem.Encode(&certout, &pem.Block{Type: "CERTIFICATE", Bytes: rawCert.Raw}); err != nil {
-		return nil, nil, err
-	}
-	certBytes := certout.Bytes()
-
-	var keyout bytes.Buffer
-
-	// encode the private key
-	if err := pem.Encode(&keyout, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(rawKey)}); err != nil {
-		return nil, nil, err
-	}
-	keyBytes := keyout.Bytes()
-
-	return certBytes, keyBytes, nil
 }
 
 func waitForLocalRegistry(port string, timeout time.Duration) error {

@@ -29,10 +29,12 @@ type InstallOptions struct {
 	KubeconfigMode string
 	// The port that the k3s API server should listen on
 	APIListenPort int
-	// Extra arguments to pass to the k3s server or agent process that are not included
-	// in the package.
+	// Extra arguments to pass to the k3s server process that are not included
+	// in the package. This includes arguments to the agent running on a server.
 	K3sServerArgs []string
-	K3sAgentArgs  []string
+	// Extra arguments to pass to the k3s agent process that are not included
+	// in the package.
+	K3sAgentArgs []string
 	// Whether to run with --cluster-init
 	InitHA bool
 	// Whether to run as a server or agent
@@ -40,23 +42,39 @@ type InstallOptions struct {
 	// Variables contain substitutions to perform on manifests before
 	// installing them to the system.
 	Variables map[string]string
+	// The password to use for authentication to the registry, if this is blank one will
+	// be generated.
+	RegistrySecret string
+	// The node port that the private registry will listen on when installed. Defaults to
+	// 30100.
+	RegistryNodePort int
+}
+
+// GetRegistryNodePort returns the node port to use for a private-registry.
+func (opts *InstallOptions) GetRegistryNodePort() int {
+	if opts.RegistryNodePort != 0 {
+		return opts.RegistryNodePort
+	}
+	return DefaultRegistryPort
 }
 
 // DeepCopy creates a copy of these installation options.
 func (opts *InstallOptions) DeepCopy() *InstallOptions {
 	newOpts := &InstallOptions{
-		NodeName:       opts.NodeName,
-		AcceptEULA:     opts.AcceptEULA,
-		ServerURL:      opts.ServerURL,
-		NodeToken:      opts.NodeToken,
-		ResolvConf:     opts.ResolvConf,
-		KubeconfigMode: opts.KubeconfigMode,
-		APIListenPort:  opts.APIListenPort,
-		K3sServerArgs:  make([]string, len(opts.K3sServerArgs)),
-		K3sAgentArgs:   make([]string, len(opts.K3sAgentArgs)),
-		InitHA:         opts.InitHA,
-		K3sRole:        opts.K3sRole,
-		Variables:      make(map[string]string),
+		NodeName:         opts.NodeName,
+		AcceptEULA:       opts.AcceptEULA,
+		ServerURL:        opts.ServerURL,
+		NodeToken:        opts.NodeToken,
+		ResolvConf:       opts.ResolvConf,
+		KubeconfigMode:   opts.KubeconfigMode,
+		APIListenPort:    opts.APIListenPort,
+		K3sServerArgs:    make([]string, len(opts.K3sServerArgs)),
+		K3sAgentArgs:     make([]string, len(opts.K3sAgentArgs)),
+		InitHA:           opts.InitHA,
+		K3sRole:          opts.K3sRole,
+		Variables:        make(map[string]string),
+		RegistrySecret:   opts.RegistrySecret,
+		RegistryNodePort: opts.RegistryNodePort,
 	}
 	copy(newOpts.K3sServerArgs, opts.K3sServerArgs)
 	copy(newOpts.K3sAgentArgs, opts.K3sAgentArgs)
