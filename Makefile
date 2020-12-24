@@ -63,7 +63,7 @@ clean:
 	find . -name '*.tgz' -exec rm {} \;
 	find . -name '*.tar' -exec rm {} \;
 	find . -name '*.run' -exec rm {} \;
-	rm -rf $(DIST)
+	rm -rf $(DIST) tls/
 
 $(GOLANGCI_LINT):
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(GOLANGCI_VERSION)
@@ -81,3 +81,10 @@ test: $(GINKGO)
 		-cover -coverprofile=k3p.coverprofile -outputdir=. -coverpkg=$(TEST_PKG) \
 		$(TEST_FLAGS) $(TEST_PKG)
 	go tool cover -func k3p.coverprofile
+
+tls:
+	bash hack/gen-cert-chain.sh
+	cat tls/intermediate-1.crt tls/ca.crt > tls/ca-bundle.crt
+
+tls-args:
+	@echo -n '--registry-tls-cert="$(CURDIR)/tls/leaf.crt" --registry-tls-key="$(CURDIR)/tls/leaf.key" --registry-tls-ca="$(CURDIR)/tls/ca-bundle.crt"'

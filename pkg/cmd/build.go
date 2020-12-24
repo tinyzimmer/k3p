@@ -36,7 +36,7 @@ func init() {
 
 	buildOpts = &types.BuildOptions{}
 
-	buildCmd.Flags().StringVarP(&buildOpts.Name, "name", "n", "", "The name to give the package, if not provided one will be generated")
+	buildCmd.Flags().StringVarP(&buildOpts.Name, "name", "n", "", `The name to give the package, if not provided one will be generated`)
 	buildCmd.Flags().StringVarP(&buildOpts.BuildVersion, "version", "V", types.VersionLatest, "The version to tag the package")
 	buildCmd.Flags().StringVar(&buildOpts.K3sVersion, "k3s-version", types.VersionLatest, "A specific k3s version to bundle with the package, overrides --channel")
 	buildCmd.Flags().StringVarP(&buildOpts.K3sChannel, "channel", "C", "stable", "The release channel to retrieve the version of k3s from")
@@ -53,7 +53,7 @@ func init() {
 	buildCmd.Flags().BoolVarP(&cache.NoCache, "no-cache", "N", false, "Disable the use of the local cache when downloading assets")
 	buildCmd.Flags().BoolVar(&buildOpts.Compress, "compress", false, "Whether to apply zst encryption to the package, it will usually require the same k3p release to decompress.")
 	buildCmd.Flags().BoolVar(&buildOpts.RunFile, "run-file", false, "Whether to bundle the final archive into a self-installing run file")
-	buildCmd.Flags().BoolVar(&buildOpts.CreateRegistry, "use-registry", false, "Bundle container images into a private registry instead of just raw tar balls")
+	buildCmd.Flags().BoolVar(&buildOpts.CreateRegistry, "build-registry", false, "Bundle container images into a private registry instead of just raw tar balls")
 
 	buildCmd.MarkFlagDirname("exclude")
 	buildCmd.MarkFlagDirname("manifests")

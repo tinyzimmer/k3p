@@ -48,6 +48,14 @@ type InstallOptions struct {
 	// The node port that the private registry will listen on when installed. Defaults to
 	// 30100.
 	RegistryNodePort int
+	// The path to a TLS certificate to use for the private registry. If left unset a
+	// self-signed certificate chain is generated.
+	RegistryTLSCertFile string
+	// The path to an unencrypted TLS private key to use for the private registry that matches
+	// the leaf certificate provided to RegistryTLSBundle. A key is generated if not provided.
+	RegistryTLSKeyFile string
+	// The path to the CA bundle for the provided TLS certificate
+	RegistryTLSCAFile string
 }
 
 // GetRegistryNodePort returns the node port to use for a private-registry.

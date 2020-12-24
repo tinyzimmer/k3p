@@ -8,3 +8,4 @@ vendor/
 *.dat
 *.run
 *kubeconfig.yaml*
+tls/

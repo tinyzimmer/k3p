@@ -22,3 +22,18 @@ type BuildRegistryOptions struct {
 func (opts *BuildRegistryOptions) RegistryImageName() string {
 	return fmt.Sprintf("%s-private-registry-data:%s", opts.Name, opts.AppVersion)
 }
+
+// RegistryTLSOptions repsent options to use when generating TLS secrets for an in-cluster
+// private registry.
+type RegistryTLSOptions struct {
+	// A name to use when generating self-signed certificates
+	Name string
+	// The path to a TLS certificate  to use for the private registry. If left unset a
+	// self-signed certificate chain is generated.
+	RegistryTLSCertFile string
+	// The path to an unencrypted TLS private key to use for the private registry that matches
+	// the leaf certificate provided to RegistryTLSBundle. A key is generated if not provided.
+	RegistryTLSKeyFile string
+	// The path to the CA bundle for the provided TLS certificate
+	RegistryTLSCAFile string
+}

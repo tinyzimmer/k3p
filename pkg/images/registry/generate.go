@@ -8,6 +8,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/tinyzimmer/k3p/pkg/log"
+	"github.com/tinyzimmer/k3p/pkg/types"
 )
 
 // These should be moved to types (or eventual apis) package
@@ -91,26 +93,27 @@ func GenerateRegistriesYaml(secret string, port int) ([]byte, error) {
 }
 
 // GenerateRegistryTLSSecrets will generate secrets and configurations for registry TLS.
-func GenerateRegistryTLSSecrets(name string) (caCertBytes, k8sManifests []byte, err error) {
-	// Generate certificates for the registry
-	// TODO: Allow user to supply certificates
-	caCert, caPriv, err := generateCACertificate(name)
-	if err != nil {
-		return nil, nil, err
+func GenerateRegistryTLSSecrets(opts *types.RegistryTLSOptions) (caCertPEM, k8sManifests []byte, err error) {
+	var registryCertPEM, registryKeyPEM []byte
+	if opts.RegistryTLSCertFile == "" || opts.RegistryTLSKeyFile == "" || opts.RegistryTLSCAFile == "" {
+		log.Debug("Generating self-signed certificate chain for registry TLS")
+		caCertPEM, registryCertPEM, registryKeyPEM, err = generateSelfSignedChain(opts.Name)
+	} else {
+		log.Debug("Loading user-supplied TLS chain")
+		caCertPEM, err = ioutil.ReadFile(opts.RegistryTLSCAFile)
+		if err != nil {
+			return
+		}
+		registryCertPEM, err = ioutil.ReadFile(opts.RegistryTLSCertFile)
+		if err != nil {
+			return
+		}
+		registryKeyPEM, err = ioutil.ReadFile(opts.RegistryTLSKeyFile)
 	}
-	registryCert, registryPriv, err := generateRegistryCertificate(caCert, caPriv, name)
 	if err != nil {
-		return nil, nil, err
+		return
 	}
-	caCertPEM, _, err := encodeToPEM(caCert, caPriv)
-	if err != nil {
-		return nil, nil, err
-	}
-	registryCertPEM, registryKeyPEM, err := encodeToPEM(registryCert, registryPriv)
-	if err != nil {
-		return nil, nil, err
-	}
-	manifests, err := executeTemplate(registryTLSTmpl, map[string]interface{}{
+	k8sManifests, err = executeTemplate(registryTLSTmpl, map[string]interface{}{
 		"KubenabTLSSecret":   KubenabTLSSecret,
 		"KubenabK8sAppName":  KubenabK8sAppName,
 		"RegistryTLSSecret":  RegistryTLSSecret,
@@ -120,7 +123,25 @@ func GenerateRegistryTLSSecrets(name string) (caCertBytes, k8sManifests []byte, 
 		"TLSPrivateKey":      string(registryKeyPEM),
 		"TLSCACertificate":   string(caCertPEM),
 	})
-	return caCertPEM, manifests, err
+	return
+}
+
+func generateSelfSignedChain(name string) (caCertPEM, tlsCertPEM, tlsKeyPEM []byte, err error) {
+	// Generate certificates for the registry
+	caCert, caPriv, err := generateCACertificate(name)
+	if err != nil {
+		return
+	}
+	tlsCert, tlsPriv, err := generateRegistryCertificate(caCert, caPriv, name)
+	if err != nil {
+		return
+	}
+	caCertPEM, err = encodeToPEM(pemTypeCertificate, caCert.Raw)
+	if err != nil {
+		return
+	}
+	tlsCertPEM, tlsKeyPEM, err = encodeKeypairToPEM(tlsCert, tlsPriv)
+	return
 }
 
 func generateCACertificate(name string) (*x509.Certificate, *rsa.PrivateKey, error) {
@@ -161,7 +182,7 @@ func generateRegistryCertificate(caCert *x509.Certificate, caKey *rsa.PrivateKey
 	}
 	fixName := strings.Replace(name, "_", "-", -1)
 	cert := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
+		SerialNumber: big.NewInt(2),
 		Subject: pkix.Name{
 			CommonName:   fmt.Sprintf("%s-private-registry", fixName),
 			Organization: []string{fmt.Sprintf("%s-private-registry", fixName)},
@@ -184,22 +205,22 @@ func generateRegistryCertificate(caCert *x509.Certificate, caKey *rsa.PrivateKey
 	return certSigned, priv, nil
 }
 
-func encodeToPEM(rawCert *x509.Certificate, rawKey *rsa.PrivateKey) (cert, key []byte, err error) {
-	var certout bytes.Buffer
+var pemTypeCertificate = "CERTIFICATE"
+var pemTypeKey = "RSA PRIVATE KEY"
 
-	// encode the certificate
-	if err := pem.Encode(&certout, &pem.Block{Type: "CERTIFICATE", Bytes: rawCert.Raw}); err != nil {
-		return nil, nil, err
+func encodeToPEM(t string, data []byte) ([]byte, error) {
+	var out bytes.Buffer
+	if err := pem.Encode(&out, &pem.Block{Type: t, Bytes: data}); err != nil {
+		return nil, err
 	}
-	certBytes := certout.Bytes()
+	return out.Bytes(), nil
+}
 
-	var keyout bytes.Buffer
-
-	// encode the private key
-	if err := pem.Encode(&keyout, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(rawKey)}); err != nil {
-		return nil, nil, err
+func encodeKeypairToPEM(rawCert *x509.Certificate, rawKey *rsa.PrivateKey) (cert, key []byte, err error) {
+	cert, err = encodeToPEM(pemTypeCertificate, rawCert.Raw)
+	if err != nil {
+		return
 	}
-	keyBytes := keyout.Bytes()
-
-	return certBytes, keyBytes, nil
+	key, err = encodeToPEM(pemTypeKey, x509.MarshalPKCS1PrivateKey(rawKey))
+	return
 }

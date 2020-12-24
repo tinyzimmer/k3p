@@ -39,8 +39,6 @@ var (
 	installDockerOpts      types.DockerClusterOptions
 )
 
-// TODO: Add flags for user to supply registry certs, port, and/or password
-
 func init() {
 
 	var currentUser *user.User
@@ -48,6 +46,12 @@ func init() {
 	if currentUser, err = user.Current(); err != nil {
 		log.Fatal(err)
 	}
+
+	installCmd.Flags().StringVar(&installOpts.RegistrySecret, "registry-secret", "", "The password to use for authentication to the private registry if included in the package. If not provided one will be generated.")
+	installCmd.Flags().IntVar(&installOpts.RegistryNodePort, "registry-port", 30100, "The node port to assign to the private registry if included in the package.")
+	installCmd.Flags().StringVar(&installOpts.RegistryTLSCertFile, "registry-tls-cert", "", "The path to a PEM encoded leaf certificate for registry TLS. If unset, a self-signed certificate will be generated.")
+	installCmd.Flags().StringVar(&installOpts.RegistryTLSKeyFile, "registry-tls-key", "", "The path to a PEM encoded private key for the leaf certificate from --registry-tls-bundle.")
+	installCmd.Flags().StringVar(&installOpts.RegistryTLSCAFile, "registry-tls-ca", "", "The path to a PEM encoded CA bundle for the leaf certificate from --registry-tls-bundle.")
 
 	installCmd.Flags().StringVarP(&installValuesFile, "values", "f", "", "An optional json or yaml file containing key-value pairs of package configurations")
 	installCmd.Flags().StringArrayVar(&installValues, "set", []string{}, "Values to set to configurations in the package in the format of --set <name>=<value>")
@@ -160,7 +164,7 @@ See the help below for additional information on available flags.
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"tar"}, cobra.ShellCompDirectiveFilterFileExt
 	},
-	RunE: func(cmd *cobra.Command, args []string) error {
+	PreRunE: func(cmd *cobra.Command, args []string) error {
 		// check the node role to make sure it's valid if relevant
 		if installOpts.ServerURL != "" && installNodeRole != "" {
 			switch types.K3sRole(installNodeRole) {
@@ -173,6 +177,17 @@ See the help below for additional information on available flags.
 			}
 		}
 
+		if installOpts.RegistryTLSCertFile != "" || installOpts.RegistryTLSKeyFile != "" || installOpts.RegistryTLSCAFile != "" {
+			for _, arg := range []string{installOpts.RegistryTLSCertFile, installOpts.RegistryTLSKeyFile, installOpts.RegistryTLSCAFile} {
+				if arg == "" {
+					return errors.New("The --registry-tls-cert, --registry-tls-key, and --registry-tls-ca flags must be used together")
+				}
+			}
+		}
+
+		return nil
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// Retrieve the package from the command line
 		pkg, err := getPackage(args[0])
 		if err != nil {

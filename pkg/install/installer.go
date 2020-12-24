@@ -136,8 +136,13 @@ func promptEULA(eula *types.Artifact, autoAccept bool) error {
 func setupPrivateRegistry(target types.Node, meta *types.PackageMeta, opts *types.InstallOptions) error {
 	registryManifestPath := path.Join(types.K3sManifestsDir, "private-registry")
 
-	log.Info("Generating PKI for registry TLS")
-	caCert, secrets, err := registry.GenerateRegistryTLSSecrets(meta.GetName())
+	log.Info("Setting up registry TLS")
+	caCert, secrets, err := registry.GenerateRegistryTLSSecrets(&types.RegistryTLSOptions{
+		Name:                meta.GetName(),
+		RegistryTLSCertFile: opts.RegistryTLSCertFile,
+		RegistryTLSKeyFile:  opts.RegistryTLSKeyFile,
+		RegistryTLSCAFile:   opts.RegistryTLSCAFile,
+	})
 	if err != nil {
 		return err
 	}

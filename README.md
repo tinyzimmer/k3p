@@ -1,6 +1,6 @@
 # k3p
 
-A `k3s` packager and installer, originally and primarily intended for air-gapped deployments, but could see use cases elsewhere.
+A `k3s` packager and installer, originally and primarily intended for air-gapped or restricted-access deployments, but could satisfy other use cases as well.
 
 For documentation on `k3p` usage, see the [command docs here](doc/k3p.md).
 
